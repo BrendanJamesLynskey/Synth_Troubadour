@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synth Troubadour — Courtly Song Synthesizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="icon-border-top"></div>
+    <div class="incense-container" id="incenseContainer"></div>
+
+    <header>
+        <div class="cross-ornament">&#x2767;</div>
+        <h1>Synth Troubadour</h1>
+        <p class="subtitle">Courtly Song &#8226; Subtractive Synthesis</p>
+        <div class="cross-ornament">&#x2767;</div>
+    </header>
+
+    <main>
+        <!-- Illuminated initial -->
+        <div class="icon-frame" id="mainIcon">
+            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illuminated initial T">
+                <defs>
+                    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stop-color="#f0d67a"/><stop offset="0.5" stop-color="#c8a84e"/><stop offset="1" stop-color="#8b6914"/>
+                    </linearGradient>
+                    <radialGradient id="halo" cx="0.5" cy="0.4" r="0.7">
+                        <stop offset="0" stop-color="#6a2440"/><stop offset="1" stop-color="#2a0f1a"/>
+                    </radialGradient>
+                    <radialGradient id="rose" cx="0.5" cy="0.45" r="0.6">
+                        <stop offset="0" stop-color="#e58aa0"/><stop offset="0.6" stop-color="#b8496a"/><stop offset="1" stop-color="#7a1f3a"/>
+                    </radialGradient>
+                </defs>
+                <rect x="8" y="8" width="184" height="184" rx="6" fill="url(#halo)" stroke="#8b6914" stroke-width="2"/>
+                <rect x="16" y="16" width="168" height="168" rx="4" fill="none" stroke="#8a2846" stroke-width="1.5" opacity="0.7"/>
+                <!-- rose-vine flourishes -->
+                <path d="M28 30 q20 -14 44 -4 M172 30 q-20 -14 -44 -4 M28 170 q20 14 44 4 M172 170 q-20 14 -44 4" fill="none" stroke="#c8a84e" stroke-width="1.4" opacity="0.55"/>
+                <circle cx="30" cy="30" r="3.5" fill="#b8496a"/><circle cx="170" cy="30" r="3.5" fill="#b8496a"/>
+                <circle cx="30" cy="170" r="3.5" fill="#b8496a"/><circle cx="170" cy="170" r="3.5" fill="#b8496a"/>
+                <!-- initial T -->
+                <text x="100" y="140" text-anchor="middle" font-family="UnifrakturMaguntia, serif" font-size="150" fill="url(#gold)" stroke="#5a4408" stroke-width="1.2">T</text>
+                <!-- courtly rose bloom above the T -->
+                <g opacity="0.92">
+                    <circle cx="100" cy="66" r="17" fill="url(#rose)" stroke="#5a4408" stroke-width="1"/>
+                    <path d="M100 52 a14 14 0 0 1 0 28 a10 10 0 0 1 0 -20 a6 6 0 0 1 0 12" fill="none" stroke="#efd9c4" stroke-width="1.1" opacity="0.7"/>
+                    <path d="M84 78 q-10 6 -16 2 M116 78 q10 6 16 2" fill="none" stroke="#4e7a3a" stroke-width="2" opacity="0.7"/>
+                </g>
+            </svg>
+        </div>
+
+        <div class="controls-panel">
+            <div class="ornament-line"><span class="ornament-dot"></span><span class="ornament-rule"></span><span class="ornament-cross">&#x2767;</span><span class="ornament-rule"></span><span class="ornament-dot"></span></div>
+
+            <div class="transport">
+                <button class="btn-chant" id="btnChant" onclick="toggleChant()">
+                    <span class="btn-icon">&#x266A;</span>
+                    <span class="btn-text">Begin Song</span>
+                </button>
+            </div>
+
+            <!-- Church modes -->
+            <div class="control-group">
+                <label class="control-label">&#x2726; Mode (Church Tone)</label>
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="1" onclick="setMode(1)">I<small>Dorian</small></button>
+                    <button class="mode-btn" data-mode="2" onclick="setMode(2)">II<small>Hypodor.</small></button>
+                    <button class="mode-btn" data-mode="3" onclick="setMode(3)">III<small>Phrygian</small></button>
+                    <button class="mode-btn" data-mode="4" onclick="setMode(4)">IV<small>Hypophr.</small></button>
+                    <button class="mode-btn" data-mode="5" onclick="setMode(5)">V<small>Lydian</small></button>
+                    <button class="mode-btn" data-mode="6" onclick="setMode(6)">VI<small>Hypolyd.</small></button>
+                    <button class="mode-btn" data-mode="7" onclick="setMode(7)">VII<small>Mixolyd.</small></button>
+                    <button class="mode-btn" data-mode="8" onclick="setMode(8)">VIII<small>Hypomix.</small></button>
+                </div>
+            </div>
+
+            <div class="sliders-grid">
+                <div class="control-group"><label class="control-label">&#x2726; Voice</label><input type="range" class="slider" id="voiceVol" min="0" max="100" value="75" oninput="updateVoice()"></div>
+                <div class="control-group"><label class="control-label">&#x2726; Drone</label><input type="range" class="slider" id="droneVol" min="0" max="100" value="40" oninput="updateDrone()"></div>
+                <div class="control-group"><label class="control-label">&#x2726; Brightness</label><input type="range" class="slider" id="brightness" min="0" max="100" value="50" oninput="updateBrightness()"></div>
+                <div class="control-group"><label class="control-label">&#x2726; Chamber Reverb</label><input type="range" class="slider" id="reverbMix" min="0" max="100" value="55" oninput="updateReverb()"></div>
+                <div class="control-group"><label class="control-label">&#x2726; Pace</label><input type="range" class="slider" id="tempoSlider" min="46" max="96" value="66" oninput="updateTempo()"></div>
+            </div>
+
+            <div class="control-group">
+                <label class="control-label">&#x2726; Ensemble</label>
+                <div class="mode-selector">
+                    <button class="choir-btn active" data-voices="1" onclick="setVoices(1)">Solo</button>
+                    <button class="choir-btn" data-voices="2" onclick="setVoices(2)">Duo</button>
+                    <button class="choir-btn" data-voices="3" onclick="setVoices(3)">Ensemble</button>
+                </div>
+            </div>
+
+            <div class="ornament-line"><span class="ornament-dot"></span><span class="ornament-rule"></span><span class="ornament-cross">&#x2767;</span><span class="ornament-rule"></span><span class="ornament-dot"></span></div>
+        </div>
+
+        <div class="visualization-frame">
+            <canvas id="vizCanvas" width="800" height="200"></canvas>
+        </div>
+
+        <!-- About this style -->
+        <div class="about-panel">
+            <h2>About Troubadour Song</h2>
+            <div class="era">Secular monophony &#8226; 12th&ndash;13th century &#8226; Occitania &amp; France</div>
+            <p><span class="drop">T</span>he troubadours of Occitania and, in the north, the trouvères were poet-composers who sang in the vernacular &mdash; Occitan and Old French &mdash; rather than in liturgical Latin. Theirs was the great secular art of <em>fin&#8217;amor</em>, courtly love: song crafted for the courts of Aquitaine, Toulouse and Champagne, prizing the lady, longing and the ache of desire above all.</p>
+            <p>The songs took shape as the <em>canso</em> (the love-song), the <em>dansa</em> and lively <em>estampida</em>. Each is a single monophonic melody, flexible in rhythm, sung to the bowed <em>vielle</em> and drone. Figures such as <em>Bernart de Ventadorn</em>, the Comtessa <em>Beatriz de Dia</em>, and the northern <em>Adam de la Halle</em> shaped a repertoire whose melodies still survive. This engine voices that lyric line with <em>subtractive synthesis</em>: a rich sawtooth carved by a moving resonant filter, over a sustained fifth.</p>
+            <div class="lineage">
+                <h3>Where it sits in the lineage</h3>
+                <p>Troubadour song is the <em>secular, vernacular</em> counterpart to sacred plainchant &mdash; a parallel monophonic tradition, but of the court and the garden rather than the abbey. Its melodies and its dance-songs fed directly into the instrumental forms of the Middle Ages, above all the whirling <em>estampie</em>.</p>
+                <div class="lineage-chain">
+                    <a href="https://brendanjameslynskey.github.io/Synth_Gregorian/">Plainsong</a>
+                    <span class="arrow">&rarr;</span>
+                    <a href="https://brendanjameslynskey.github.io/Synth_Organum/">Organum</a>
+                    <span class="arrow">&rarr;</span>
+                    <a href="https://brendanjameslynskey.github.io/Synth_ArsNova/">Ars Nova</a>
+                    <span class="arrow">&#8231;&#8231;&#8231;</span>
+                    <span class="node current">Troubadour</span>
+                    <span class="arrow">&rarr;</span>
+                    <a href="https://brendanjameslynskey.github.io/Synth_Estampie/">Estampie</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="cross-ornament small">&#x2767;</div>
+        <p>Can vei la lauzeta mover</p>
+        <p class="latin">When I see the lark beat its wings for joy</p>
+    </footer>
+
+    <script src="troubadour-engine.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

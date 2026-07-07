@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Synth Troubadour — Courtly Song Synthesizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+/* === Synth Troubadour — Styles (courtly love: rose, wine-red, gold) === */
+
+:root {
+    --gold: #c8a84e;
+    --gold-bright: #f0d67a;
+    --gold-dark: #8b6914;
+    --accent: #8a2846;          /* wine-rose */
+    --accent-light: #b8496a;
+    --ink: #1a0e13;
+    --ink-deep: #120810;
+    --panel-line: rgba(200, 168, 78, 0.22);
+    --parchment: #efe3c4;
+    --text-main: #ecd8c8;
+    --text-dim: #c7a2a0;
+    --bg-dark: #14080d;
+    --bg-panel: rgba(34, 16, 23, 0.85);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'EB Garamond', 'Cormorant Garamond', Georgia, serif;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(200, 168, 78, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 50% 100%, rgba(138, 40, 70, 0.10) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Faint ruled-manuscript / four-line stave texture */
+body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'%3E%3Cpath d='M0 20h80M0 34h80M0 48h80M0 62h80' stroke='%23c8a84e' stroke-width='0.3' opacity='0.05'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+}
+
+.icon-border-top {
+    height: 6px;
+    background: linear-gradient(90deg, transparent 0%, var(--gold-dark) 15%, var(--gold-bright) 30%, var(--gold) 50%, var(--gold-bright) 70%, var(--gold-dark) 85%, transparent 100%);
+    position: relative;
+    z-index: 10;
+}
+.icon-border-top::after {
+    content: '';
+    display: block;
+    height: 2px;
+    margin-top: 2px;
+    background: linear-gradient(90deg, transparent 0%, var(--accent) 20%, var(--accent-light) 50%, var(--accent) 80%, transparent 100%);
+}
+
+/* Floating rose petals */
+.incense-container { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+.smoke-particle {
+    position: absolute;
+    width: 4px; height: 4px;
+    background: radial-gradient(circle, rgba(200, 90, 110, 0.4), transparent);
+    border-radius: 50%;
+    animation: smokeRise linear forwards;
+}
+@keyframes smokeRise {
+    0% { opacity: 0; transform: translateY(0) translateX(0) scale(1); }
+    20% { opacity: 0.45; }
+    100% { opacity: 0; transform: translateY(-420px) translateX(var(--drift)) scale(7); }
+}
+
+header {
+    text-align: center;
+    padding: 2.5rem 1rem 1.2rem;
+    position: relative;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.4rem;
+    flex-wrap: wrap;
+}
+.cross-ornament { font-size: 1.9rem; color: var(--gold); text-shadow: 0 0 15px rgba(200, 168, 78, 0.5); line-height: 1; }
+.cross-ornament.small { font-size: 1.1rem; }
+
+h1 {
+    font-family: 'UnifrakturMaguntia', 'Cinzel', serif;
+    font-size: clamp(2rem, 5vw, 3.4rem);
+    font-weight: 400;
+    color: var(--gold-bright);
+    text-shadow: 0 0 20px rgba(240, 214, 122, 0.3), 0 2px 4px rgba(0, 0, 0, 0.5);
+    letter-spacing: 0.04em;
+}
+.subtitle {
+    font-family: 'Cinzel', serif;
+    font-size: 0.95rem;
+    color: var(--text-dim);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-top: 0.3rem;
+    flex-basis: 100%;
+}
+
+main { max-width: 860px; margin: 0 auto; padding: 0 1.5rem 3rem; position: relative; z-index: 5; }
+
+/* Illuminated-initial frame (inline SVG lives inside) */
+.icon-frame {
+    width: 230px;
+    margin: 0 auto 1.6rem;
+    padding: 12px;
+    background: linear-gradient(145deg, #2e1620, #180b12);
+    border: 4px solid var(--gold-dark);
+    border-radius: 8px;
+    box-shadow: 0 0 30px rgba(200, 168, 78, 0.15), inset 0 0 20px rgba(200, 168, 78, 0.05), 0 8px 32px rgba(0, 0, 0, 0.5);
+    position: relative;
+    cursor: pointer;
+    transition: box-shadow 0.5s ease, transform 0.3s ease;
+    overflow: hidden;
+}
+.icon-frame:hover { box-shadow: 0 0 50px rgba(200, 168, 78, 0.25), inset 0 0 30px rgba(200, 168, 78, 0.08), 0 8px 32px rgba(0, 0, 0, 0.5); transform: scale(1.02); }
+.icon-frame.active { box-shadow: 0 0 60px rgba(240, 214, 122, 0.35), inset 0 0 30px rgba(200, 168, 78, 0.1), 0 8px 32px rgba(0, 0, 0, 0.5); border-color: var(--gold-bright); }
+.icon-frame::before { content: ''; position: absolute; inset: 5px; border: 1px solid var(--gold-dark); border-radius: 4px; opacity: 0.5; pointer-events: none; z-index: 2; }
+.icon-frame svg { width: 100%; height: auto; display: block; position: relative; z-index: 1; }
+
+.controls-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 1.6rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+}
+
+.ornament-line { display: flex; align-items: center; gap: 0.5rem; margin: 1.1rem 0; }
+.ornament-dot { width: 6px; height: 6px; background: var(--gold); border-radius: 50%; flex-shrink: 0; }
+.ornament-rule { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--gold-dark), transparent); }
+.ornament-cross { color: var(--gold); font-size: 1rem; flex-shrink: 0; opacity: 0.7; }
+
+.transport { display: flex; justify-content: center; margin: 1.4rem 0; }
+.btn-chant {
+    font-family: 'Cinzel', serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--parchment);
+    background: linear-gradient(145deg, var(--accent), #5c1830);
+    border: 2px solid var(--gold-dark);
+    border-radius: 50px;
+    padding: 1rem 2.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    box-shadow: 0 4px 15px rgba(138, 40, 70, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    letter-spacing: 0.05em;
+}
+.btn-chant:hover { background: linear-gradient(145deg, var(--accent-light), var(--accent)); border-color: var(--gold); box-shadow: 0 4px 20px rgba(138, 40, 70, 0.6), 0 0 20px rgba(200, 168, 78, 0.2); transform: translateY(-1px); }
+.btn-chant:active { transform: translateY(1px); }
+.btn-chant.playing { background: linear-gradient(145deg, #6a1f3c, #45152a); border-color: var(--gold-bright); animation: glowPulse 3s ease-in-out infinite; }
+@keyframes glowPulse {
+    0%, 100% { box-shadow: 0 4px 20px rgba(138, 40, 70, 0.4), 0 0 20px rgba(240, 214, 122, 0.12); }
+    50% { box-shadow: 0 4px 25px rgba(138, 40, 70, 0.6), 0 0 35px rgba(240, 214, 122, 0.28); }
+}
+.btn-icon { font-size: 1.3rem; }
+
+.control-label { display: block; font-family: 'Cinzel', serif; font-size: 0.82rem; color: var(--text-dim); letter-spacing: 0.1em; margin-bottom: 0.55rem; text-transform: uppercase; }
+.control-group { margin-bottom: 1.1rem; }
+
+.mode-selector { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.mode-btn, .choir-btn {
+    font-family: 'Cinzel', serif;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    background: rgba(52, 24, 33, 0.6);
+    border: 1px solid var(--panel-line);
+    border-radius: 6px;
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 46px;
+    text-align: center;
+}
+.mode-btn:hover, .choir-btn:hover { background: rgba(200, 168, 78, 0.1); border-color: var(--gold-dark); }
+.mode-btn.active, .choir-btn.active { color: var(--gold-bright); background: rgba(200, 168, 78, 0.15); border-color: var(--gold); box-shadow: 0 0 10px rgba(200, 168, 78, 0.15); }
+.mode-btn small { display: block; font-size: 0.62rem; letter-spacing: 0.03em; opacity: 0.75; margin-top: 2px; }
+
+.sliders-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 2rem; }
+@media (max-width: 600px) { .sliders-grid { grid-template-columns: 1fr; } }
+
+.slider {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 6px;
+    background: linear-gradient(90deg, var(--ink-deep), #3a1c26);
+    border-radius: 3px; outline: none;
+    border: 1px solid rgba(200, 168, 78, 0.15);
+}
+.slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; background: radial-gradient(circle at 40% 40%, var(--gold-bright), var(--gold-dark)); border-radius: 50%; cursor: pointer; border: 2px solid var(--gold); box-shadow: 0 0 8px rgba(200, 168, 78, 0.3); }
+.slider::-webkit-slider-thumb:hover { box-shadow: 0 0 15px rgba(200, 168, 78, 0.5); }
+.slider::-moz-range-thumb { width: 20px; height: 20px; background: radial-gradient(circle at 40% 40%, var(--gold-bright), var(--gold-dark)); border-radius: 50%; cursor: pointer; border: 2px solid var(--gold); box-shadow: 0 0 8px rgba(200, 168, 78, 0.3); }
+
+.visualization-frame { background: var(--bg-panel); border: 1px solid var(--panel-line); border-radius: 12px; padding: 1rem; overflow: hidden; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3); margin-bottom: 1.6rem; }
+#vizCanvas { width: 100%; height: 160px; display: block; border-radius: 6px; }
+
+/* About-this-style panel */
+.about-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--panel-line);
+    border-radius: 12px;
+    padding: 1.8rem 2rem;
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    line-height: 1.65;
+}
+.about-panel h2 { font-family: 'Cinzel', serif; font-size: 1rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-bright); margin-bottom: 0.4rem; }
+.about-panel .era { font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-light); margin-bottom: 1rem; }
+.about-panel p { color: var(--text-dim); font-size: 1.02rem; margin-bottom: 0.9rem; }
+.about-panel p:last-child { margin-bottom: 0; }
+.about-panel .drop { color: var(--gold-bright); font-weight: 600; }
+.lineage { margin-top: 1.2rem; padding-top: 1.1rem; border-top: 1px solid var(--panel-line); }
+.lineage h3 { font-family: 'Cinzel', serif; font-size: 0.78rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.7rem; }
+.lineage-chain { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; font-family: 'Cinzel', serif; font-size: 0.72rem; letter-spacing: 0.04em; }
+.lineage-chain a, .lineage-chain span.node { color: var(--text-dim); text-decoration: none; padding: 0.3rem 0.6rem; border: 1px solid var(--panel-line); border-radius: 5px; transition: all 0.2s ease; white-space: nowrap; }
+.lineage-chain a:hover { color: var(--gold-bright); border-color: var(--gold); }
+.lineage-chain span.node.current { color: var(--ink); background: var(--gold); border-color: var(--gold); font-weight: 600; }
+.lineage-chain .arrow { color: var(--gold-dark); }
+
+footer { text-align: center; padding: 2rem 1rem 3rem; position: relative; z-index: 5; }
+footer p { font-family: 'Cinzel', serif; font-size: 0.85rem; color: var(--text-dim); letter-spacing: 0.15em; margin-top: 0.5rem; }
+footer .latin { font-family: 'EB Garamond', serif; font-style: italic; font-size: 0.85rem; color: var(--gold-dark); margin-top: 0.3rem; }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-dark); }
+::-webkit-scrollbar-thumb { background: var(--gold-dark); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold); }
+::selection { background: rgba(200, 168, 78, 0.3); color: var(--parchment); }
+
+
+/* mobile safe areas */
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.mode-btn, .choir-btn, .btn-chant { min-height: 44px; }
+.icon-frame { width: 180px; }
+main { padding-left: 1rem; padding-right: 1rem; }
+</style>
+</head>
+<body>
+    <div class="icon-border-top"></div>
+    <div class="incense-container" id="incenseContainer"></div>
+
+    <header>
+        <div class="cross-ornament">&#x2767;</div>
+        <h1>Synth Troubadour</h1>
+        <p class="subtitle">Courtly Song &#8226; Subtractive Synthesis</p>
+        <div class="cross-ornament">&#x2767;</div>
+    </header>
+
+    <main>
+        <!-- Illuminated initial -->
+        <div class="icon-frame" id="mainIcon">
+            <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illuminated initial T">
+                <defs>
+                    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stop-color="#f0d67a"/><stop offset="0.5" stop-color="#c8a84e"/><stop offset="1" stop-color="#8b6914"/>
+                    </linearGradient>
+                    <radialGradient id="halo" cx="0.5" cy="0.4" r="0.7">
+                        <stop offset="0" stop-color="#6a2440"/><stop offset="1" stop-color="#2a0f1a"/>
+                    </radialGradient>
+                    <radialGradient id="rose" cx="0.5" cy="0.45" r="0.6">
+                        <stop offset="0" stop-color="#e58aa0"/><stop offset="0.6" stop-color="#b8496a"/><stop offset="1" stop-color="#7a1f3a"/>
+                    </radialGradient>
+                </defs>
+                <rect x="8" y="8" width="184" height="184" rx="6" fill="url(#halo)" stroke="#8b6914" stroke-width="2"/>
+                <rect x="16" y="16" width="168" height="168" rx="4" fill="none" stroke="#8a2846" stroke-width="1.5" opacity="0.7"/>
+                <!-- rose-vine flourishes -->
+                <path d="M28 30 q20 -14 44 -4 M172 30 q-20 -14 -44 -4 M28 170 q20 14 44 4 M172 170 q-20 14 -44 4" fill="none" stroke="#c8a84e" stroke-width="1.4" opacity="0.55"/>
+                <circle cx="30" cy="30" r="3.5" fill="#b8496a"/><circle cx="170" cy="30" r="3.5" fill="#b8496a"/>
+                <circle cx="30" cy="170" r="3.5" fill="#b8496a"/><circle cx="170" cy="170" r="3.5" fill="#b8496a"/>
+                <!-- initial T -->
+                <text x="100" y="140" text-anchor="middle" font-family="UnifrakturMaguntia, serif" font-size="150" fill="url(#gold)" stroke="#5a4408" stroke-width="1.2">T</text>
+                <!-- courtly rose bloom above the T -->
+                <g opacity="0.92">
+                    <circle cx="100" cy="66" r="17" fill="url(#rose)" stroke="#5a4408" stroke-width="1"/>
+                    <path d="M100 52 a14 14 0 0 1 0 28 a10 10 0 0 1 0 -20 a6 6 0 0 1 0 12" fill="none" stroke="#efd9c4" stroke-width="1.1" opacity="0.7"/>
+                    <path d="M84 78 q-10 6 -16 2 M116 78 q10 6 16 2" fill="none" stroke="#4e7a3a" stroke-width="2" opacity="0.7"/>
+                </g>
+            </svg>
+        </div>
+
+        <div class="controls-panel">
+            <div class="ornament-line"><span class="ornament-dot"></span><span class="ornament-rule"></span><span class="ornament-cross">&#x2767;</span><span class="ornament-rule"></span><span class="ornament-dot"></span></div>
+
+            <div class="transport">
+                <button class="btn-chant" id="btnChant" onclick="toggleChant()">
+                    <span class="btn-icon">&#x266A;</span>
+                    <span class="btn-text">Begin Song</span>
+                </button>
+            </div>
+
+            <!-- Church modes -->
+            <div class="control-group">
+                <label class="control-label">&#x2726; Mode (Church Tone)</label>
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="1" onclick="setMode(1)">I<small>Dorian</small></button>
+                    <button class="mode-btn" data-mode="2" onclick="setMode(2)">II<small>Hypodor.</small></button>
+                    <button class="mode-btn" data-mode="3" onclick="setMode(3)">III<small>Phrygian</small></button>
+                    <button class="mode-btn" data-mode="4" onclick="setMode(4)">IV<small>Hypophr.</small></button>
+                    <button class="mode-btn" data-mode="5" onclick="setMode(5)">V<small>Lydian</small></button>
+                    <button class="mode-btn" data-mode="6" onclick="setMode(6)">VI<small>Hypolyd.</small></button>
+                    <button class="mode-btn" data-mode="7" onclick="setMode(7)">VII<small>Mixolyd.</small></button>
+                    <button class="mode-btn" data-mode="8" onclick="setMode(8)">VIII<small>Hypomix.</small></button>
+                </div>
+            </div>
+
+            <div class="sliders-grid">
+                <div class="control-group"><label class="control-label">&#x2726; Voice</label><input type="range" class="slider" id="voiceVol" min="0" max="100" value="75" oninput="updateVoice()"></div>
+                <div class="control-group"><label class="control-label">&#x2726; Drone</label><input type="range" class="slider" id="droneVol" min="0" max="100" value="40" oninput="updateDrone()"></div>
+                <div class="control-group"><label class="control-label">&#x2726; Brightness</label><input type="range" class="slider" id="brightness" min="0" max="100" value="50" oninput="updateBrightness()"></div>
+                <div class="control-group"><label class="control-label">&#x2726; Chamber Reverb</label><input type="range" class="slider" id="reverbMix" min="0" max="100" value="55" oninput="updateReverb()"></div>
+                <div class="control-group"><label class="control-label">&#x2726; Pace</label><input type="range" class="slider" id="tempoSlider" min="46" max="96" value="66" oninput="updateTempo()"></div>
+            </div>
+
+            <div class="control-group">
+                <label class="control-label">&#x2726; Ensemble</label>
+                <div class="mode-selector">
+                    <button class="choir-btn active" data-voices="1" onclick="setVoices(1)">Solo</button>
+                    <button class="choir-btn" data-voices="2" onclick="setVoices(2)">Duo</button>
+                    <button class="choir-btn" data-voices="3" onclick="setVoices(3)">Ensemble</button>
+                </div>
+            </div>
+
+            <div class="ornament-line"><span class="ornament-dot"></span><span class="ornament-rule"></span><span class="ornament-cross">&#x2767;</span><span class="ornament-rule"></span><span class="ornament-dot"></span></div>
+        </div>
+
+        <div class="visualization-frame">
+            <canvas id="vizCanvas" width="800" height="200"></canvas>
+        </div>
+
+        <!-- About this style -->
+        <div class="about-panel">
+            <h2>About Troubadour Song</h2>
+            <div class="era">Secular monophony &#8226; 12th&ndash;13th century &#8226; Occitania &amp; France</div>
+            <p><span class="drop">T</span>he troubadours of Occitania and, in the north, the trouvères were poet-composers who sang in the vernacular &mdash; Occitan and Old French &mdash; rather than in liturgical Latin. Theirs was the great secular art of <em>fin&#8217;amor</em>, courtly love: song crafted for the courts of Aquitaine, Toulouse and Champagne, prizing the lady, longing and the ache of desire above all.</p>
+            <p>The songs took shape as the <em>canso</em> (the love-song), the <em>dansa</em> and lively <em>estampida</em>. Each is a single monophonic melody, flexible in rhythm, sung to the bowed <em>vielle</em> and drone. Figures such as <em>Bernart de Ventadorn</em>, the Comtessa <em>Beatriz de Dia</em>, and the northern <em>Adam de la Halle</em> shaped a repertoire whose melodies still survive. This engine voices that lyric line with <em>subtractive synthesis</em>: a rich sawtooth carved by a moving resonant filter, over a sustained fifth.</p>
+            <div class="lineage">
+                <h3>Where it sits in the lineage</h3>
+                <p>Troubadour song is the <em>secular, vernacular</em> counterpart to sacred plainchant &mdash; a parallel monophonic tradition, but of the court and the garden rather than the abbey. Its melodies and its dance-songs fed directly into the instrumental forms of the Middle Ages, above all the whirling <em>estampie</em>.</p>
+                <div class="lineage-chain">
+                    <a href="https://brendanjameslynskey.github.io/Synth_Gregorian/">Plainsong</a>
+                    <span class="arrow">&rarr;</span>
+                    <a href="https://brendanjameslynskey.github.io/Synth_Organum/">Organum</a>
+                    <span class="arrow">&rarr;</span>
+                    <a href="https://brendanjameslynskey.github.io/Synth_ArsNova/">Ars Nova</a>
+                    <span class="arrow">&#8231;&#8231;&#8231;</span>
+                    <span class="node current">Troubadour</span>
+                    <span class="arrow">&rarr;</span>
+                    <a href="https://brendanjameslynskey.github.io/Synth_Estampie/">Estampie</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="cross-ornament small">&#x2767;</div>
+        <p>Can vei la lauzeta mover</p>
+        <p class="latin">When I see the lark beat its wings for joy</p>
+    </footer>
+
+    <script>
+/**
+ * Troubadour Song Synthesis Engine — Subtractive (Analog-Style) Synthesis
+ *
+ * The troubadours and trouvères sang a monophonic, expressive lyric line over
+ * a sustained drone. This engine voices that with the classic subtractive
+ * chain — a harmonically rich oscillator, carved by a moving resonant filter,
+ * shaped by an amplifier envelope:
+ *
+ *   - SOURCE   : one or two slightly detuned SAWTOOTH oscillators (rich in
+ *                harmonics, like a bowed vielle/rebec string) plus an optional
+ *                sub-oscillator for body.
+ *   - FILTER   : a resonant low-pass BiquadFilter whose cutoff is swept by a
+ *                per-note filter envelope (ADSR on filter.frequency) with a
+ *                singing resonance (Q). A slow filter LFO adds a vocal, formant-
+ *                like "wah" — the heart of subtractive synthesis.
+ *   - AMPLIFIER: an amp-envelope gain shapes each note's loudness.
+ *
+ * Beneath the lyric line a DRONE holds an open fifth (tonic + fifth), also made
+ * subtractively — saw oscillators through a gently resonant low-pass pad, as a
+ * vielle or citole would drone beneath a sung canso.
+ *
+ * On top: the 8 medieval church modes, phrase-based arch-shaped melodies (the
+ * canso) with breathing between phrases, light vibrato, a schola of detuned
+ * voices, and a warm great-chamber convolution reverb.
+ */
+
+class TroubadourEngine {
+    constructor() {
+        this.ctx = null;
+        this.isPlaying = false;
+        this.currentMode = 1;
+        this.numVoices = 1;
+        this.tempo = 66;                // lyric pace, syllables-per-minute-ish
+        this.voiceVolume = 0.75;        // melody / lyric line
+        this.droneVolume = 0.4;         // sustained fifth beneath
+        this.brightness = 0.5;          // maps to filter cutoff (0..1)
+        this.resonance = 8.5;           // filter Q, folded into the note envelope
+        this.reverbMix = 0.55;
+
+        this.voices = [];               // persistent per-singer melody chains
+        this.droneNodes = [];           // sustained drone oscillators
+        this.droneFilter = null;
+        this.droneBus = null;
+        this.phraseTimeout = null;
+        this.activeNotes = [];
+
+        this.masterGain = null;
+        this.mixBus = null;
+        this.melodyBus = null;
+        this.reverbGain = null;
+        this.dryGain = null;
+        this.convolver = null;
+        this.analyser = null;
+
+        // G3 — a lyric vielle/voice register for the canso.
+        this.basePitch = 196;
+
+        // === The 8 medieval church modes ===
+        // intervals: cents from the finalis; tenor: reciting-tone scale degree.
+        this.modes = {
+            1: { name: "Dorian",        intervals: [0,200,300,500,700,900,1000,1200], finalis: 0, tenor: 4, up: 5 },
+            2: { name: "Hypodorian",    intervals: [0,200,300,500,700,900,1000,1200], finalis: 0, tenor: 2, up: 4 },
+            3: { name: "Phrygian",      intervals: [0,100,300,500,700,800,1000,1200], finalis: 0, tenor: 5, up: 6 },
+            4: { name: "Hypophrygian",  intervals: [0,100,300,500,700,800,1000,1200], finalis: 0, tenor: 3, up: 5 },
+            5: { name: "Lydian",        intervals: [0,200,400,600,700,900,1100,1200], finalis: 0, tenor: 4, up: 6 },
+            6: { name: "Hypolydian",    intervals: [0,200,400,600,700,900,1100,1200], finalis: 0, tenor: 2, up: 4 },
+            7: { name: "Mixolydian",    intervals: [0,200,400,500,700,900,1000,1200], finalis: 0, tenor: 4, up: 6 },
+            8: { name: "Hypomixolydian",intervals: [0,200,400,500,700,900,1000,1200], finalis: 0, tenor: 3, up: 5 }
+        };
+
+        this.phrasePos = 0;
+        this.phrase = [];
+    }
+
+    async init() {
+        if (this.ctx) return;
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0.8;
+        this.masterGain.connect(this.ctx.destination);
+
+        this.analyser = this.ctx.createAnalyser();
+        this.analyser.fftSize = 2048;
+        this.analyser.smoothingTimeConstant = 0.85;
+        this.masterGain.connect(this.analyser);
+
+        await this.createReverb();
+
+        // Shared reverb send: mixBus → dry + convolver → master.
+        this.mixBus = this.ctx.createGain();
+        this.mixBus.gain.value = 1.0;
+
+        this.dryGain = this.ctx.createGain();
+        this.dryGain.gain.value = 1 - this.reverbMix * 0.5;
+
+        this.reverbGain = this.ctx.createGain();
+        this.reverbGain.gain.value = this.reverbMix;
+
+        this.mixBus.connect(this.dryGain);
+        this.mixBus.connect(this.convolver);
+        this.dryGain.connect(this.masterGain);
+        this.convolver.connect(this.reverbGain);
+        this.reverbGain.connect(this.masterGain);
+
+        // Melody line bus (lyric voice volume) feeds the reverb send.
+        this.melodyBus = this.ctx.createGain();
+        this.melodyBus.gain.value = this.voiceVolume;
+        this.melodyBus.connect(this.mixBus);
+
+        // Drone bus feeds the same send, under the melody.
+        this.droneBus = this.ctx.createGain();
+        this.droneBus.gain.value = 0;
+        this.droneBus.connect(this.mixBus);
+    }
+
+    /** Warm great-chamber / hall — ~3.5 s tail with early reflections. */
+    async createReverb() {
+        const sr = this.ctx.sampleRate;
+        const length = Math.floor(sr * 3.5);
+        const impulse = this.ctx.createBuffer(2, length, sr);
+        const reflections = [0.009, 0.019, 0.031, 0.047, 0.063, 0.083, 0.107, 0.133];
+        for (let ch = 0; ch < 2; ch++) {
+            const data = impulse.getChannelData(ch);
+            for (let i = 0; i < length; i++) {
+                const t = i / sr;
+                const env = Math.exp(-t * 1.0) * 0.4 + Math.exp(-t * 0.45) * 0.4 + Math.exp(-t * 0.22) * 0.2;
+                data[i] = (Math.random() * 2 - 1) * env;
+                if (i < sr * 0.16) {
+                    for (const d of reflections) {
+                        if (i === Math.floor(d * sr)) data[i] += (Math.random() * 2 - 1) * 0.3;
+                    }
+                }
+            }
+        }
+        this.convolver = this.ctx.createConvolver();
+        this.convolver.buffer = impulse;
+    }
+
+    centsToFreq(cents) { return this.basePitch * Math.pow(2, cents / 1200); }
+    clampFreq(f) { const nyq = this.ctx.sampleRate / 2; return Math.max(40, Math.min(nyq * 0.9, f)); }
+
+    // === Drone: a sustained open fifth made subtractively ===
+
+    startDrone() {
+        this.teardownDrone();
+        const now = this.ctx.currentTime;
+
+        // A gently resonant low-pass pad shared by the drone oscillators.
+        this.droneFilter = this.ctx.createBiquadFilter();
+        this.droneFilter.type = 'lowpass';
+        this.droneFilter.Q.value = 4;
+        this.droneFilter.frequency.value = this.clampFreq(this.basePitch * (3 + this.brightness * 4));
+        this.droneFilter.connect(this.droneBus);
+
+        // Slow cutoff LFO so the drone breathes.
+        const lfo = this.ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.12;
+        const lfoDepth = this.ctx.createGain();
+        lfoDepth.gain.value = this.basePitch * 0.6;
+        lfo.connect(lfoDepth); lfoDepth.connect(this.droneFilter.frequency);
+        lfo.start(now);
+        this.droneNodes.push({ osc: lfo });
+
+        // Tonic + perfect fifth, each a pair of detuned saws for warmth.
+        const fifth = this.basePitch * Math.pow(2, 700 / 1200);
+        const partials = [
+            { f: this.basePitch,     g: 0.5 },
+            { f: this.basePitch * 2, g: 0.18 },
+            { f: fifth,              g: 0.34 }
+        ];
+        for (const p of partials) {
+            for (const det of [-5, 5]) {
+                const osc = this.ctx.createOscillator();
+                osc.type = 'sawtooth';
+                osc.frequency.value = p.f;
+                osc.detune.value = det;
+                const g = this.ctx.createGain();
+                g.gain.value = p.g * 0.5;
+                osc.connect(g); g.connect(this.droneFilter);
+                osc.start(now);
+                this.droneNodes.push({ osc });
+            }
+        }
+
+        // Fade the drone in under the melody.
+        this.droneBus.gain.cancelScheduledValues(now);
+        this.droneBus.gain.setValueAtTime(0, now);
+        this.droneBus.gain.linearRampToValueAtTime(this.droneVolume, now + 2.2);
+    }
+
+    teardownDrone() {
+        const now = this.ctx ? this.ctx.currentTime : 0;
+        if (this.droneBus) {
+            this.droneBus.gain.cancelScheduledValues(now);
+            this.droneBus.gain.setValueAtTime(this.droneBus.gain.value, now);
+            this.droneBus.gain.linearRampToValueAtTime(0, now + 1.5);
+        }
+        const nodes = this.droneNodes;
+        this.droneNodes = [];
+        setTimeout(() => {
+            for (const n of nodes) { try { n.osc.stop(); } catch (e) {} }
+        }, 1800);
+    }
+
+    // === Melody voices (the lyric line) ===
+
+    /**
+     * One singer's persistent chain: an output gain into the melody bus and a
+     * slow filter LFO that every note of this voice taps for expressivity.
+     *   note oscillators → resonant low-pass (per note) → amp env → outGain
+     */
+    createVoice(index, total) {
+        const now = this.ctx.currentTime;
+
+        const outGain = this.ctx.createGain();
+        const perVoice = [0.55, 0.4, 0.32, 0.28];
+        const vol = perVoice[Math.min(index, perVoice.length - 1)];
+        outGain.gain.setValueAtTime(0, now);
+        outGain.gain.linearRampToValueAtTime(vol, now + 1.2 + index * 0.4);
+        outGain.connect(this.melodyBus);
+
+        // Shared filter LFO — a slow cutoff wobble giving a vocal, singing quality.
+        const filterLFO = this.ctx.createOscillator();
+        filterLFO.type = 'sine';
+        filterLFO.frequency.value = 3.4 + Math.random() * 1.2;
+        const lfoDepth = this.ctx.createGain();
+        lfoDepth.gain.value = 220 + Math.random() * 120;   // Hz of cutoff swing
+        filterLFO.connect(lfoDepth);
+        filterLFO.start(now);
+
+        // Per-singer detune so a unison ensemble shimmers.
+        const detuneCents = (index - (total - 1) / 2) * 8 + (Math.random() - 0.5) * 4;
+
+        return { outGain, filterLFO, lfoDepth, detuneCents };
+    }
+
+    setupVoices() {
+        this.teardownVoices();
+        for (let v = 0; v < this.numVoices; v++) {
+            this.voices.push(this.createVoice(v, this.numVoices));
+        }
+    }
+
+    teardownVoices() {
+        const now = this.ctx ? this.ctx.currentTime : 0;
+        for (const voice of this.voices) {
+            try {
+                voice.outGain.gain.cancelScheduledValues(now);
+                voice.outGain.gain.setValueAtTime(voice.outGain.gain.value, now);
+                voice.outGain.gain.linearRampToValueAtTime(0, now + 1.5);
+                setTimeout(() => { try { voice.filterLFO.stop(); } catch (e) {} }, 1800);
+            } catch (e) {}
+        }
+        this.voices = [];
+    }
+
+    // === Melody generation: arch-shaped canso phrase ===
+
+    start() {
+        this.isPlaying = true;
+        this.phrasePos = 0;
+        this.buildPhrase();
+        this.scheduleNote();
+    }
+
+    stop() {
+        this.isPlaying = false;
+        if (this.phraseTimeout) { clearTimeout(this.phraseTimeout); this.phraseTimeout = null; }
+        const now = this.ctx ? this.ctx.currentTime : 0;
+        for (const n of this.activeNotes) {
+            try {
+                n.gain.gain.cancelScheduledValues(now);
+                n.gain.gain.setValueAtTime(n.gain.gain.value, now);
+                n.gain.gain.linearRampToValueAtTime(0, now + 1.0);
+                const oscs = n.oscs;
+                setTimeout(() => { for (const o of oscs) { try { o.stop(); } catch (e) {} } }, 1300);
+            } catch (e) {}
+        }
+        this.activeNotes = [];
+        this.teardownVoices();
+        this.teardownDrone();
+    }
+
+    /**
+     * Compose a lyrical, arch-shaped canso phrase in the current mode: lift up
+     * from around the finalis toward a high point near the modal ceiling, then
+     * descend by step to cadence home. Flexible rhythm with an occasional
+     * dansa-like lilt and small slurred ornaments. Values are scale degrees.
+     */
+    buildPhrase() {
+        const m = this.modes[this.currentMode];
+        const top = Math.max(m.tenor + 1, m.up + 1);
+        const phrase = [];
+        const dansa = Math.random() < 0.4;   // some songs lilt like a dance
+
+        // Ascent: rise toward the phrase peak with light steps and a small leap.
+        let deg = 0;
+        phrase.push({ deg: 0, len: dansa ? 0.7 : 1.0 });
+        while (deg < top) {
+            const step = (Math.random() < 0.75) ? 1 : 2;
+            deg = Math.min(top, deg + step);
+            const len = dansa ? (phrase.length % 2 ? 0.5 : 0.9) : (0.7 + Math.random() * 0.4);
+            if (Math.random() < 0.28) {
+                phrase.push({ deg, len, neume: [deg, deg + 1, deg] });   // upper turn
+            } else {
+                phrase.push({ deg, len });
+            }
+        }
+        // Dwell on the peak — the emotional apex of the canso.
+        phrase.push({ deg: top, len: dansa ? 1.0 : 1.5 });
+
+        // Descent: mostly stepwise fall back to the finalis, breathing wider.
+        for (let d = top - 1; d >= 0; d--) {
+            if (Math.random() < 0.22 && d < top - 1) {
+                phrase.push({ deg: d, len: 0.8, neume: [d + 1, d] });    // slurred fall
+            } else {
+                phrase.push({ deg: d, len: dansa ? (d % 2 ? 0.6 : 0.9) : (0.8 + Math.random() * 0.4) });
+            }
+        }
+        phrase[phrase.length - 1].len = 2.4;   // lengthened final on the finalis
+
+        this.phrase = phrase;
+        this.phrasePos = 0;
+    }
+
+    scheduleNote() {
+        if (!this.isPlaying) return;
+        const m = this.modes[this.currentMode];
+        const item = this.phrase[this.phrasePos];
+        const beat = 60 / this.tempo;
+
+        const degToFreq = (deg) => {
+            const idx = ((deg % 8) + 8) % 8;
+            const oct = Math.floor(deg / 8);
+            return this.centsToFreq(m.intervals[idx]) * Math.pow(2, oct);
+        };
+
+        // A syllable may carry a small slur (several notes on one breath).
+        const notes = item.neume
+            ? item.neume.map(d => degToFreq(d))
+            : [degToFreq(item.deg)];
+        const syllableDur = beat * item.len;
+        const noteDur = syllableDur / notes.length;
+
+        notes.forEach((freq, i) => {
+            this.playMelodyNote(freq, noteDur, i * noteDur);
+        });
+
+        this.phrasePos++;
+        const phraseEnd = this.phrasePos >= this.phrase.length;
+        // Breathe at the end of a phrase; small lift between notes.
+        const pause = phraseEnd ? beat * 1.4 : beat * 0.06;
+        if (phraseEnd) this.buildPhrase();
+
+        this.phraseTimeout = setTimeout(() => this.scheduleNote(), (syllableDur + pause) * 1000);
+    }
+
+    /** One subtractively-synthesised note across every voice in the ensemble. */
+    playMelodyNote(freq, duration, delay) {
+        const t0 = this.ctx.currentTime + (delay || 0);
+        for (const voice of this.voices) {
+            // --- SOURCE: two detuned saws + a sub-oscillator for body ---
+            const osc1 = this.ctx.createOscillator();
+            const osc2 = this.ctx.createOscillator();
+            osc1.type = 'sawtooth';
+            osc2.type = 'sawtooth';
+            osc1.frequency.value = freq;
+            osc2.frequency.value = freq;
+            const jitter = (Math.random() - 0.5) * 4;
+            osc1.detune.value = voice.detuneCents - 6 + jitter;
+            osc2.detune.value = voice.detuneCents + 6 + jitter;
+
+            const sub = this.ctx.createOscillator();
+            sub.type = 'sine';
+            sub.frequency.value = freq / 2;
+
+            const oscMix = this.ctx.createGain();
+            oscMix.gain.value = 0.5;
+            osc1.connect(oscMix); osc2.connect(oscMix);
+            const subGain = this.ctx.createGain();
+            subGain.gain.value = 0.22;
+            sub.connect(subGain);
+
+            // --- FILTER: resonant low-pass swept by a filter envelope ---
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.Q.value = this.resonance;
+            const baseCut = this.clampFreq(freq * (1.5 + this.brightness * 2.5));
+            const peakCut = this.clampFreq(freq * (4 + this.brightness * 9));
+            const susCut  = this.clampFreq(freq * (2.2 + this.brightness * 4));
+            const fa = Math.min(0.11, duration * 0.3);
+            const fd = Math.min(0.22, duration * 0.5);
+            filter.frequency.setValueAtTime(baseCut, t0);
+            filter.frequency.linearRampToValueAtTime(peakCut, t0 + fa);
+            filter.frequency.linearRampToValueAtTime(susCut, t0 + fa + fd);
+            // Tap the voice's shared filter LFO for a singing "wah".
+            voice.lfoDepth.connect(filter.frequency);
+
+            // --- AMPLIFIER: ADSR amp envelope ---
+            const amp = this.ctx.createGain();
+            const attack = Math.min(0.08, duration * 0.3);
+            const release = Math.max(0.18, duration * 0.5);
+            const peak = 0.5;
+            amp.gain.setValueAtTime(0, t0);
+            amp.gain.linearRampToValueAtTime(peak, t0 + attack);
+            amp.gain.setValueAtTime(peak * 0.85, t0 + Math.max(attack, duration * 0.7));
+            amp.gain.exponentialRampToValueAtTime(0.001, t0 + duration + release);
+
+            oscMix.connect(filter);
+            filter.connect(amp);
+            subGain.connect(amp);
+            amp.connect(voice.outGain);
+
+            // Light vibrato blooms on sustained notes.
+            let vib = null;
+            if (duration > 0.5) {
+                vib = this.ctx.createOscillator();
+                vib.type = 'sine';
+                vib.frequency.value = 5.0 + Math.random() * 1.0;
+                const vibDepth = this.ctx.createGain();
+                vibDepth.gain.value = freq * 0.008;
+                vib.connect(vibDepth);
+                vibDepth.connect(osc1.frequency);
+                vibDepth.connect(osc2.frequency);
+                vib.start(t0 + attack);
+                vib.stop(t0 + duration + release);
+            }
+
+            osc1.start(t0); osc2.start(t0); sub.start(t0);
+            const stopT = t0 + duration + release + 0.1;
+            osc1.stop(stopT); osc2.stop(stopT); sub.stop(stopT);
+
+            const node = {
+                oscs: [osc1, osc2, sub],
+                gain: amp,
+                releaseLfo: () => { try { voice.lfoDepth.disconnect(filter.frequency); } catch (e) {} }
+            };
+            this.activeNotes.push(node);
+            setTimeout(() => {
+                node.releaseLfo();
+                const idx = this.activeNotes.indexOf(node);
+                if (idx > -1) this.activeNotes.splice(idx, 1);
+            }, (duration + release + 0.2) * 1000);
+        }
+    }
+
+    // === Public transport / control ===
+
+    async begin() {
+        await this.init();
+        if (this.ctx.state === 'suspended') await this.ctx.resume();
+        this.setupVoices();
+        this.startDrone();
+        setTimeout(() => { if (!this.isPlaying) this.start(); }, 1500);
+    }
+
+    end() { this.stop(); }
+
+    setMode(mode) {
+        this.currentMode = mode;
+        if (this.isPlaying) { this.buildPhrase(); }
+    }
+
+    setVoices(count) {
+        this.numVoices = count;
+        if (this.voices.length) { this.setupVoices(); }
+    }
+
+    setVoiceVolume(v) {
+        this.voiceVolume = v;
+        if (this.melodyBus) this.melodyBus.gain.linearRampToValueAtTime(v, this.ctx.currentTime + 0.2);
+    }
+
+    setDroneVolume(v) {
+        this.droneVolume = v;
+        if (this.droneBus && this.droneNodes.length) {
+            this.droneBus.gain.linearRampToValueAtTime(v, this.ctx.currentTime + 0.3);
+        }
+    }
+
+    setBrightness(v) {
+        this.brightness = v;
+        if (this.droneFilter) {
+            const cut = this.clampFreq(this.basePitch * (3 + v * 4));
+            this.droneFilter.frequency.linearRampToValueAtTime(cut, this.ctx.currentTime + 0.3);
+        }
+    }
+
+    setReverbMix(v) {
+        this.reverbMix = v;
+        if (this.reverbGain && this.dryGain) {
+            const now = this.ctx.currentTime;
+            this.reverbGain.gain.linearRampToValueAtTime(v, now + 0.2);
+            this.dryGain.gain.linearRampToValueAtTime(1 - v * 0.5, now + 0.2);
+        }
+    }
+
+    setTempo(bpm) { this.tempo = bpm; }
+
+    getAnalyserData() {
+        if (!this.analyser) return null;
+        const d = new Uint8Array(this.analyser.frequencyBinCount);
+        this.analyser.getByteTimeDomainData(d);
+        return d;
+    }
+    getFrequencyData() {
+        if (!this.analyser) return null;
+        const d = new Uint8Array(this.analyser.frequencyBinCount);
+        this.analyser.getByteFrequencyData(d);
+        return d;
+    }
+}
+
+</script>
+    <script>
+/**
+ * Synth Troubadour — UI Controller
+ */
+
+const engine = new TroubadourEngine();
+let animationId = null;
+let isSinging = false;
+
+// === Transport ===
+
+async function toggleChant() {
+    const btn = document.getElementById('btnChant');
+    const icon = document.getElementById('mainIcon');
+
+    if (!isSinging) {
+        await engine.begin();
+        isSinging = true;
+        btn.classList.add('playing');
+        btn.querySelector('.btn-text').textContent = 'Silence';
+        btn.querySelector('.btn-icon').textContent = '■';
+        icon.classList.add('active');
+        startVisualization();
+        startMotes();
+    } else {
+        engine.end();
+        isSinging = false;
+        btn.classList.remove('playing');
+        btn.querySelector('.btn-text').textContent = 'Begin Song';
+        btn.querySelector('.btn-icon').textContent = '♪';
+        icon.classList.remove('active');
+        stopVisualization();
+    }
+}
+
+// === Controls ===
+
+function setMode(mode) {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.mode-btn[data-mode="${mode}"]`).classList.add('active');
+    engine.setMode(mode);
+}
+
+function setVoices(count) {
+    document.querySelectorAll('.choir-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.choir-btn[data-voices="${count}"]`).classList.add('active');
+    engine.setVoices(count);
+}
+
+function updateVoice() { engine.setVoiceVolume(document.getElementById('voiceVol').value / 100); }
+function updateDrone() { engine.setDroneVolume(document.getElementById('droneVol').value / 100); }
+function updateBrightness() { engine.setBrightness(document.getElementById('brightness').value / 100); }
+function updateReverb() { engine.setReverbMix(document.getElementById('reverbMix').value / 100); }
+function updateTempo() { engine.setTempo(parseInt(document.getElementById('tempoSlider').value)); }
+
+// === Visualization: a lit stave in rose and gold ===
+
+function startVisualization() {
+    const canvas = document.getElementById('vizCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    const width = canvas.offsetWidth;
+    const height = canvas.offsetHeight;
+
+    function draw() {
+        animationId = requestAnimationFrame(draw);
+        const waveData = engine.getAnalyserData();
+        const freqData = engine.getFrequencyData();
+        if (!waveData || !freqData) return;
+
+        ctx.fillStyle = 'rgba(18, 8, 12, 0.3)';
+        ctx.fillRect(0, 0, width, height);
+
+        // Four faint stave lines
+        ctx.strokeStyle = 'rgba(200, 168, 78, 0.12)';
+        ctx.lineWidth = 1;
+        for (let l = 1; l <= 4; l++) {
+            const y = height * (0.25 + l * 0.11);
+            ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(width - 20, y); ctx.stroke();
+        }
+
+        // Frequency bars as garden light — wine at the root, gold at the tip
+        const barCount = 72;
+        const barWidth = width / barCount;
+        const freqStep = Math.floor(freqData.length / barCount);
+        for (let i = 0; i < barCount; i++) {
+            const value = freqData[i * freqStep] / 255;
+            const barHeight = value * height * 0.7;
+            const x = i * barWidth;
+            const g = ctx.createLinearGradient(x, height, x, height - barHeight);
+            g.addColorStop(0, `rgba(138, 40, 70, ${0.15 + value * 0.4})`);
+            g.addColorStop(0.5, `rgba(200, 90, 110, ${value * 0.35})`);
+            g.addColorStop(1, `rgba(240, 214, 122, ${value * 0.4})`);
+            ctx.fillStyle = g;
+            ctx.fillRect(x + 1, height - barHeight, barWidth - 2, barHeight);
+        }
+
+        // Flowing waveform — the lyric line
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(240, 214, 122, 0.6)';
+        ctx.lineWidth = 1.5;
+        const slice = width / waveData.length;
+        let x = 0;
+        for (let i = 0; i < waveData.length; i++) {
+            const v = waveData[i] / 128.0;
+            const y = (v * height) / 2;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            x += slice;
+        }
+        ctx.stroke();
+    }
+    draw();
+}
+
+function stopVisualization() {
+    if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+    const canvas = document.getElementById('vizCanvas');
+    const ctx = canvas.getContext('2d');
+    const width = canvas.offsetWidth, height = canvas.offsetHeight;
+    let alpha = 1;
+    function fade() {
+        ctx.fillStyle = 'rgba(18, 8, 12, 0.05)';
+        ctx.fillRect(0, 0, width, height);
+        alpha -= 0.02;
+        if (alpha > 0) requestAnimationFrame(fade);
+    }
+    fade();
+}
+
+// === Drifting rose petals ===
+
+let motesInterval = null;
+function startMotes() {
+    const container = document.getElementById('incenseContainer');
+    if (motesInterval) return;
+    motesInterval = setInterval(() => {
+        if (!isSinging) return;
+        const p = document.createElement('div');
+        p.className = 'smoke-particle';
+        p.style.left = (30 + Math.random() * (window.innerWidth - 60)) + 'px';
+        p.style.bottom = '0px';
+        p.style.setProperty('--drift', ((Math.random() - 0.5) * 90) + 'px');
+        const dur = 7 + Math.random() * 8;
+        p.style.animationDuration = dur + 's';
+        const s = 3 + Math.random() * 4;
+        p.style.width = s + 'px'; p.style.height = s + 'px';
+        container.appendChild(p);
+        setTimeout(() => p.remove(), dur * 1000);
+    }, 340);
+}
+
+window.addEventListener('resize', () => { if (isSinging) { stopVisualization(); startVisualization(); } });
+
+window.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('vizCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    ctx.fillStyle = 'rgba(18, 8, 12, 1)';
+    ctx.fillRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
+    ctx.strokeStyle = 'rgba(200, 168, 78, 0.12)';
+    ctx.lineWidth = 1;
+    for (let l = 1; l <= 4; l++) {
+        const y = canvas.offsetHeight * (0.25 + l * 0.11);
+        ctx.beginPath(); ctx.moveTo(20, y); ctx.lineTo(canvas.offsetWidth - 20, y); ctx.stroke();
+    }
+    ctx.font = '14px Cinzel, serif';
+    ctx.fillStyle = 'rgba(200, 168, 78, 0.35)';
+    ctx.textAlign = 'center';
+    ctx.fillText('Press "Begin Song" to sing', canvas.offsetWidth / 2, canvas.offsetHeight / 2 + 4);
+});
+
+</script>
+</body>
+</html>
