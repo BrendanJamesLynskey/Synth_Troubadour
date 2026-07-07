@@ -2,20 +2,20 @@
  * Troubadour Song Synthesis Engine — a SUNG melody over an instrumental drone
  *
  * Historically the troubadour or trouvère SANG the canso; the vielle or citole
- * only accompanied. So the melodic lead here is a human VOICE, built with the
- * classic source–filter (formant) technique, while the drone beneath stays an
- * instrument, made subtractively.
+ * only accompanied. So the melodic lead here is a human VOICE, sung with the
+ * shared `vocal-voices.js` vocal-synthesis library, while the drone beneath
+ * stays an instrument, made subtractively.
  *
- *   - VOICE (the sung lyric line) : a glottal pulse — a custom PeriodicWave whose
- *                harmonics roll off ~12 dB/octave, like flow through vibrating
- *                vocal folds — shaped by a bank of four parallel resonant
- *                band-pass "formants" that sing recognisable vowels (a e i o u).
- *                Each singer keeps a persistent vocal tract; only the pitch (the
- *                fold frequency) changes note to note, exactly as in real singing.
- *                Light vibrato blooms on held notes and neighbouring pitches glide
- *                legato, for an expressive, haunting solo canso line. The Ensemble
- *                control (Solo / Duo / Ensemble) layers extra detuned, jittered
- *                singers.
+ *   - VOICE (the sung lyric line) : the `vocal-voices.js` library (default
+ *                technique FOF — Fonction d'Onde Formantique, the IRCAM CHANT
+ *                method): a burst of overlapping formant grains per glottal
+ *                period reconstructs a true sung vocal spectrum with real vowel
+ *                formants (a e i o u). Each singer is a persistent library voice;
+ *                only the pitch and vowel change note to note, exactly as in real
+ *                singing. Held notes bloom with vibrato and neighbouring pitches
+ *                glide legato, for an expressive, haunting solo canso line. The
+ *                Ensemble control (Solo / Duo / Ensemble) layers extra detuned,
+ *                jittered singers.
  *
  *   - DRONE (the accompaniment)   : a sustained open fifth (tonic + fifth) held
  *                SUBTRACTIVELY — detuned sawtooth oscillators through a gently
@@ -48,6 +48,7 @@ class TroubadourEngine {
         this.activeNotes = [];
 
         this.masterGain = null;
+        this.limiter = null;
         this.mixBus = null;
         this.melodyBus = null;
         this.voiceTone = null;          // high-shelf: vocal "brightness"
@@ -55,7 +56,6 @@ class TroubadourEngine {
         this.dryGain = null;
         this.convolver = null;
         this.analyser = null;
-        this.glottalWave = null;
 
         // G3 — a lyric voice register for the sung canso.
         this.basePitch = 196;
@@ -97,7 +97,13 @@ class TroubadourEngine {
 
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = 0.8;
-        this.masterGain.connect(this.ctx.destination);
+
+        // Soft limiter before the destination keeps voice + drone from clipping.
+        this.limiter = this.ctx.createDynamicsCompressor();
+        this.limiter.threshold.value = -8; this.limiter.knee.value = 8;
+        this.limiter.ratio.value = 6; this.limiter.attack.value = 0.004; this.limiter.release.value = 0.25;
+        this.masterGain.connect(this.limiter);
+        this.limiter.connect(this.ctx.destination);
 
         this.analyser = this.ctx.createAnalyser();
         this.analyser.fftSize = 2048;
@@ -140,19 +146,8 @@ class TroubadourEngine {
         this.droneBus.gain.value = 0;
         this.droneBus.connect(this.mixBus);
 
-        this.buildGlottalWave();
-    }
-
-    /**
-     * The glottal source: harmonics rolling off ~ -12 dB/oct. A little richer
-     * than a sawtooth so the higher formants have partials to resonate.
-     */
-    buildGlottalWave() {
-        const n = 48;
-        const real = new Float32Array(n);
-        const imag = new Float32Array(n);
-        for (let k = 1; k < n; k++) imag[k] = 1 / Math.pow(k, 1.2);   // spectral tilt
-        this.glottalWave = this.ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+        // Load the vocal-synthesis worklets (FOF, vocal tract) once.
+        await VocalVoices.init(this.ctx);
     }
 
     /** Warm great-chamber / hall — ~3.5 s tail with early reflections. */
@@ -248,16 +243,12 @@ class TroubadourEngine {
     // === Singers (the sung lyric line) ===
 
     /**
-     * Build one singer's persistent vocal tract:
-     *   sourceGain → [4 parallel band-pass formants] → outGain → melodyBus
-     * Note oscillators (the folds) connect transiently into sourceGain; breath
-     * noise adds air. Only the pitch changes per note — the tract persists.
+     * Build one singer as a persistent FOF library voice:
+     *   voice.output → noteGain (per-note envelope) → outGain (fade-in) → melodyBus
+     * Only the pitch and vowel change per note — the singer persists.
      */
     createVoice(index, total) {
         const now = this.ctx.currentTime;
-
-        const sourceGain = this.ctx.createGain();
-        sourceGain.gain.value = 1.0;
 
         const outGain = this.ctx.createGain();
         const perVoice = [0.55, 0.4, 0.32, 0.28];
@@ -266,41 +257,24 @@ class TroubadourEngine {
         outGain.gain.linearRampToValueAtTime(vol, now + 1.2 + index * 0.4);
         outGain.connect(this.melodyBus);
 
-        // Four parallel formant resonators, tuned to the opening vowel.
-        const formantGainsRel = [1.0, 0.5, 0.28, 0.16];
-        const bandwidths = [80, 90, 120, 150];
-        const formants = [];
-        const v0 = this.vowels[this.vowelSequence[0]];
-        for (let f = 0; f < 4; f++) {
-            const bp = this.ctx.createBiquadFilter();
-            bp.type = 'bandpass';
-            bp.frequency.value = v0[f];
-            bp.Q.value = v0[f] / bandwidths[f];
-            const fg = this.ctx.createGain();
-            fg.gain.value = formantGainsRel[f];
-            sourceGain.connect(bp);
-            bp.connect(fg);
-            fg.connect(outGain);
-            formants.push({ bp, fg, bandwidth: bandwidths[f] });
-        }
-
-        // Breath — filtered noise for air, gated softly with the sung tone.
-        const noiseBuf = this.ctx.createBuffer(1, this.ctx.sampleRate * 2, this.ctx.sampleRate);
-        const nd = noiseBuf.getChannelData(0);
-        for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-        const noise = this.ctx.createBufferSource();
-        noise.buffer = noiseBuf; noise.loop = true;
-        const noiseBp = this.ctx.createBiquadFilter();
-        noiseBp.type = 'bandpass'; noiseBp.frequency.value = 2600; noiseBp.Q.value = 0.7;
-        const noiseGain = this.ctx.createGain();
-        noiseGain.gain.value = 0;
-        noise.connect(noiseBp); noiseBp.connect(noiseGain); noiseGain.connect(sourceGain);
-        noise.start(now);
+        // Per-note amplitude envelope, shared by this singer across notes.
+        const noteGain = this.ctx.createGain();
+        noteGain.gain.value = 0.0001;
+        noteGain.connect(outGain);
 
         // Per-singer pitch drift so a unison ensemble shimmers.
         const detuneCents = (index - (total - 1) / 2) * 9 + (Math.random() - 0.5) * 5;
 
-        return { sourceGain, outGain, formants, noise, noiseGain, detuneCents, vowel: this.vowelSequence[0] };
+        const voice = VocalVoices.create(this.ctx, {
+            technique: 'fof',
+            vowel: this.vowelSequence[0],
+            detuneCents,
+            breath: 0.03 + this.breath * 0.07,
+            vibDepth: 0.007
+        });
+        voice.output.connect(noteGain);
+
+        return { voice, noteGain, outGain, detuneCents, vowel: this.vowelSequence[0] };
     }
 
     setupVoices() {
@@ -317,23 +291,17 @@ class TroubadourEngine {
                 voice.outGain.gain.cancelScheduledValues(now);
                 voice.outGain.gain.setValueAtTime(voice.outGain.gain.value, now);
                 voice.outGain.gain.linearRampToValueAtTime(0, now + 1.5);
-                setTimeout(() => { try { voice.noise.stop(); } catch (e) {} }, 1800);
+                const v = voice.voice;
+                setTimeout(() => { try { v.dispose(); } catch (e) {} }, 1800);
             } catch (e) {}
         }
         this.voices = [];
     }
 
-    /** Ramp a singer's formant bank toward a new vowel (vocal-tract transition). */
+    /** Morph a singer's library voice toward a new sung vowel. */
     setVowel(voice, vowel) {
-        const target = this.vowels[vowel];
-        if (!target) return;
-        const now = this.ctx.currentTime;
-        voice.formants.forEach((fm, f) => {
-            fm.bp.frequency.cancelScheduledValues(now);
-            fm.bp.frequency.setValueAtTime(fm.bp.frequency.value, now);
-            fm.bp.frequency.linearRampToValueAtTime(target[f], now + 0.12);
-            fm.bp.Q.setValueAtTime(Math.max(0.5, target[f] / fm.bandwidth), now + 0.12);
-        });
+        if (!this.vowels[vowel]) return;
+        voice.voice.setVowel(vowel, this.ctx.currentTime);
         voice.vowel = vowel;
     }
 
@@ -451,10 +419,10 @@ class TroubadourEngine {
     }
 
     /**
-     * Sing one note across every singer in the ensemble: a glottal-pulse fold
-     * oscillator through a per-note amplitude envelope into that singer's formant
-     * tract (voice.sourceGain). Neighbouring pitches glide legato; held notes
-     * bloom with light vibrato; breath swells with the tone.
+     * Sing one note across every singer in the ensemble by steering each singer's
+     * persistent FOF library voice (pitch + vowel) and re-shaping its shared
+     * per-note amplitude envelope. Neighbouring pitches glide legato; the library
+     * adds its own light vibrato and breath.
      */
     playMelodyNote(freq, duration, delay, vowel, slideFrom) {
         if (!isFinite(freq) || freq <= 0) return;
@@ -462,56 +430,24 @@ class TroubadourEngine {
         for (const voice of this.voices) {
             this.setVowel(voice, vowel);
 
-            const osc = this.ctx.createOscillator();
-            osc.setPeriodicWave(this.glottalWave);
-            const jitter = (Math.random() - 0.5) * 6;               // pitch shimmer of a real voice
-            osc.detune.value = voice.detuneCents + jitter;
-
-            if (slideFrom && isFinite(slideFrom)) {
-                osc.frequency.setValueAtTime(slideFrom, t0);
-                osc.frequency.exponentialRampToValueAtTime(freq, t0 + Math.min(0.14, duration * 0.45));
+            const glide = (slideFrom && isFinite(slideFrom)) ? Math.min(0.14, duration * 0.45) : 0;
+            if (glide > 0) {
+                voice.voice.setFrequency(slideFrom, t0, 0);
+                voice.voice.setFrequency(freq, t0, glide);
             } else {
-                osc.frequency.setValueAtTime(freq, t0);
+                voice.voice.setFrequency(freq, t0, 0);
             }
+            voice.voice.setLevel(1, t0);
 
-            const gain = this.ctx.createGain();
+            const g = voice.noteGain.gain;
             const attack = Math.min(0.16, duration * 0.35);
             const release = Math.max(0.22, duration * 0.55);
             const peak = 0.9;
-            gain.gain.setValueAtTime(0.0001, t0);
-            gain.gain.linearRampToValueAtTime(peak, t0 + attack);
-            gain.gain.setValueAtTime(peak * 0.9, t0 + Math.max(attack, duration * 0.7));
-            gain.gain.exponentialRampToValueAtTime(0.0008, t0 + duration + release);
-
-            osc.connect(gain);
-            gain.connect(voice.sourceGain);
-
-            // Light vibrato blooms on longer, held notes only.
-            if (duration > 0.5) {
-                const vib = this.ctx.createOscillator();
-                vib.type = 'sine';
-                vib.frequency.value = 4.8 + Math.random() * 1.2;
-                const vibDepth = this.ctx.createGain();
-                vibDepth.gain.value = freq * 0.007;
-                vib.connect(vibDepth); vibDepth.connect(osc.frequency);
-                vib.start(t0 + attack); vib.stop(t0 + duration + release);
-            }
-
-            // Breath swells with the sung note.
-            voice.noiseGain.gain.cancelScheduledValues(t0);
-            voice.noiseGain.gain.setValueAtTime(voice.noiseGain.gain.value, t0);
-            voice.noiseGain.gain.linearRampToValueAtTime(0.06 * this.breath, t0 + attack);
-            voice.noiseGain.gain.linearRampToValueAtTime(0.01 * this.breath, t0 + duration + release);
-
-            osc.start(t0);
-            osc.stop(t0 + duration + release + 0.1);
-
-            const node = { osc, gain };
-            this.activeNotes.push(node);
-            setTimeout(() => {
-                const idx = this.activeNotes.indexOf(node);
-                if (idx > -1) this.activeNotes.splice(idx, 1);
-            }, (duration + release + 0.2 + (delay || 0)) * 1000);
+            g.cancelScheduledValues(t0);
+            g.setValueAtTime(Math.max(0.0001, g.value), t0);
+            g.linearRampToValueAtTime(peak, t0 + attack);
+            g.setValueAtTime(peak * 0.9, t0 + Math.max(attack, duration * 0.7));
+            g.exponentialRampToValueAtTime(0.0008, t0 + duration + release);
         }
     }
 

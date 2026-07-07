@@ -270,7 +270,7 @@ main { padding-left: 1rem; padding-right: 1rem; }
     <header>
         <div class="cross-ornament">&#x2767;</div>
         <h1>Synth Troubadour</h1>
-        <p class="subtitle">Courtly Song &#8226; Formant Vocal Synthesis</p>
+        <p class="subtitle">Courtly Song &#8226; FOF Vocal Synthesis</p>
         <div class="cross-ornament">&#x2767;</div>
     </header>
 
@@ -360,7 +360,7 @@ main { padding-left: 1rem; padding-right: 1rem; }
             <h2>About Troubadour Song</h2>
             <div class="era">Secular monophony &#8226; 12th&ndash;13th century &#8226; Occitania &amp; France</div>
             <p><span class="drop">T</span>he troubadours of Occitania and, in the north, the trouvères were poet-composers who sang in the vernacular &mdash; Occitan and Old French &mdash; rather than in liturgical Latin. Theirs was the great secular art of <em>fin&#8217;amor</em>, courtly love: song crafted for the courts of Aquitaine, Toulouse and Champagne, prizing the lady, longing and the ache of desire above all.</p>
-            <p>The songs took shape as the <em>canso</em> (the love-song), the <em>dansa</em> and lively <em>estampida</em>. Each is a single monophonic melody, flexible in rhythm &mdash; the poet <em>sang</em> the line while the bowed <em>vielle</em> held a drone beneath. Figures such as <em>Bernart de Ventadorn</em>, the Comtessa <em>Beatriz de Dia</em>, and the northern <em>Adam de la Halle</em> shaped a repertoire whose melodies still survive. This engine sings that lyric line with <em>formant vocal synthesis</em> &mdash; a glottal pulse shaped by the vowel-forming resonances of a human vocal tract, a haunting solo voice &mdash; over a subtractive-synth <em>vielle</em> drone.</p>
+            <p>The songs took shape as the <em>canso</em> (the love-song), the <em>dansa</em> and lively <em>estampida</em>. Each is a single monophonic melody, flexible in rhythm &mdash; the poet <em>sang</em> the line while the bowed <em>vielle</em> held a drone beneath. Figures such as <em>Bernart de Ventadorn</em>, the Comtessa <em>Beatriz de Dia</em>, and the northern <em>Adam de la Halle</em> shaped a repertoire whose melodies still survive. This engine sings that lyric line with the shared <em>FOF vocal-synthesis</em> library (<code>vocal-voices.js</code>, the IRCAM <em>CHANT</em> method) &mdash; overlapping formant grains sung as vowels, a haunting solo voice &mdash; over a subtractive-synth <em>vielle</em> drone.</p>
             <div class="lineage">
                 <h3>Where it sits in the lineage</h3>
                 <p>Troubadour song is the <em>secular, vernacular</em> counterpart to sacred plainchant &mdash; a parallel monophonic tradition, but of the court and the garden rather than the abbey. Its melodies and its dance-songs fed directly into the instrumental forms of the Middle Ages, above all the whirling <em>estampie</em>.</p>
@@ -387,23 +387,292 @@ main { padding-left: 1rem; padding-right: 1rem; }
 
     <script>
 /**
+ * vocal-voices.js — a small library of interchangeable VOCAL SYNTHESIS engines
+ * for the Web Audio API, sharing one interface. No samples, no dependencies.
+ *
+ * Techniques (each a genuinely different way of making a sung voice):
+ *
+ *   'fof'      FOF — Fonction d'Onde Formantique (IRCAM CHANT). The voice is a
+ *              stream of overlapping formant grains, one burst per glottal pulse.
+ *              Runs in an AudioWorklet. The most convincingly "sung" of the four.
+ *
+ *   'formant'  Source–filter. A glottal-pulse oscillator run through a bank of
+ *              parallel resonant band-pass formant filters. Native Web Audio nodes.
+ *
+ *   'additive' Additive / spectral. A sum of harmonics whose amplitudes trace the
+ *              vowel's formant envelope, rebuilt per note as a PeriodicWave so the
+ *              formants stay fixed while the pitch moves.
+ *
+ *   'tract'    Physical model. A Kelly–Lochbaum digital waveguide of the vocal
+ *              tract — a ladder of cylindrical sections whose area function makes
+ *              the vowel — excited by a glottal pulse. Runs in an AudioWorklet.
+ *
+ * Usage:
+ *   await VocalVoices.init(ctx);                       // load the worklets once
+ *   const v = VocalVoices.create(ctx, { technique:'fof', vowel:'a', detuneCents:0 });
+ *   v.output.connect(dest);
+ *   v.setFrequency(220, ctx.currentTime, 0.1);         // pitch (with optional glide)
+ *   v.setLevel(1, ctx.currentTime);                    // gate the voice on
+ *   v.setVowel('o', ctx.currentTime);                  // morph the vowel
+ *   v.dispose();
+ */
+(function (global) {
+    'use strict';
+
+    // ── Sung-vowel formant tables: five formants {f: Hz, a: amp, bw: Hz} ─────────
+    const VOWELS = {
+        a: [{f:650,a:1,bw:80},{f:1080,a:0.5,bw:90},{f:2650,a:0.28,bw:120},{f:2900,a:0.2,bw:130},{f:3250,a:0.1,bw:140}],
+        e: [{f:400,a:1,bw:70},{f:1700,a:0.45,bw:100},{f:2500,a:0.32,bw:120},{f:2900,a:0.22,bw:130},{f:3300,a:0.12,bw:140}],
+        i: [{f:290,a:1,bw:60},{f:2100,a:0.4,bw:110},{f:2800,a:0.34,bw:120},{f:3300,a:0.24,bw:130},{f:3600,a:0.12,bw:150}],
+        o: [{f:400,a:1,bw:70},{f:760,a:0.34,bw:80},{f:2550,a:0.2,bw:120},{f:2850,a:0.15,bw:130},{f:3250,a:0.08,bw:140}],
+        u: [{f:350,a:1,bw:65},{f:600,a:0.26,bw:75},{f:2400,a:0.16,bw:120},{f:2800,a:0.1,bw:130},{f:3200,a:0.06,bw:140}]
+    };
+
+    // Vocal-tract constriction presets (tongue index/diameter, lip aperture) for
+    // the Kelly–Lochbaum model. index is fraction glottis→lips.
+    const TRACT_VOWELS = {
+        a: { tongueIndex: 0.35, tongueDiameter: 2.6, lip: 1.5 },
+        e: { tongueIndex: 0.56, tongueDiameter: 1.7, lip: 1.4 },
+        i: { tongueIndex: 0.74, tongueDiameter: 1.05, lip: 1.4 },
+        o: { tongueIndex: 0.40, tongueDiameter: 1.9, lip: 0.8 },
+        u: { tongueIndex: 0.50, tongueDiameter: 1.4, lip: 0.7 }
+    };
+
+    // ── Worklet source: FOF grain voice ─────────────────────────────────────────
+    const FOF_SRC = `
+    class FofVoiceProcessor extends AudioWorkletProcessor {
+      static get parameterDescriptors(){return [
+        {name:'frequency',defaultValue:130,minValue:20,maxValue:3000,automationRate:'a-rate'},
+        {name:'level',defaultValue:0,minValue:0,maxValue:2,automationRate:'a-rate'}];}
+      constructor(o){super();o=(o&&o.processorOptions)||{};this.sr=sampleRate;this.phase=0;this.grains=[];
+        this.formants=o.formants||[{f:600,a:1,bw:90}];this.tex=o.tex||0.004;
+        this.breath=o.breath!=null?o.breath:0.06;this.jitter=o.jitter!=null?o.jitter:0.03;
+        this.vibRate=4.2+Math.random()*1.6;this.vibDepth=o.vibDepth!=null?o.vibDepth:0.006;this.vibPhase=Math.random()*6.283;
+        this.prune=Math.floor(0.065*this.sr);this.maxG=28;
+        this.port.onmessage=(e)=>{if(e.data.formants)this.formants=e.data.formants;if(e.data.breath!=null)this.breath=e.data.breath;};}
+      process(inp,outp,p){const out=outp[0][0];if(!out)return true;const fA=p.frequency,lA=p.level,n=out.length,T=6.283185307;
+        for(let i=0;i<n;i++){const lvl=lA.length>1?lA[i]:lA[0];let f0=fA.length>1?fA[i]:fA[0];
+          this.vibPhase+=T*this.vibRate/this.sr;if(this.vibPhase>T)this.vibPhase-=T;f0*=1+Math.sin(this.vibPhase)*this.vibDepth;
+          this.phase+=f0/this.sr;
+          if(this.phase>=1){this.phase-=1;if(lvl>0.0002||this.grains.length){this.grains.push({age:0,amp:1+(Math.random()-0.5)*this.jitter});
+            while(this.grains.length&&this.grains[0].age>this.prune)this.grains.shift();if(this.grains.length>this.maxG)this.grains.shift();}}
+          let s=0;const F=this.formants,tex=this.tex;
+          for(let g=0;g<this.grains.length;g++){const gr=this.grains[g],t=gr.age/this.sr;let atk=1;if(t<tex)atk=0.5*(1-Math.cos(Math.PI*t/tex));
+            for(let k=0;k<F.length;k++){const fm=F[k],env=atk*Math.exp(-Math.PI*fm.bw*t);if(env>1e-4)s+=gr.amp*fm.a*env*Math.sin(T*fm.f*t);}gr.age++;}
+          if(this.breath>0)s+=(Math.random()*2-1)*this.breath*(0.4+0.6*Math.min(1,this.grains.length/3));
+          out[i]=s*lvl*0.22;}
+        return true;}}
+    registerProcessor('fof-voice',FofVoiceProcessor);`;
+
+    // ── Worklet source: Kelly–Lochbaum vocal-tract voice ────────────────────────
+    const TRACT_SRC = `
+    class TractVoiceProcessor extends AudioWorkletProcessor {
+      static get parameterDescriptors(){return [
+        {name:'frequency',defaultValue:130,minValue:20,maxValue:3000,automationRate:'a-rate'},
+        {name:'level',defaultValue:0,minValue:0,maxValue:2,automationRate:'a-rate'}];}
+      constructor(o){super();o=(o&&o.processorOptions)||{};this.sr=sampleRate;this.N=28;
+        this.L=new Float64Array(this.N);this.R=new Float64Array(this.N);
+        this.jL=new Float64Array(this.N+1);this.jR=new Float64Array(this.N+1);
+        this.k=new Float64Array(this.N+1);this.diam=new Float64Array(this.N);
+        this.glottalRefl=0.75;this.lipRefl=-0.85;this.phase=0;this.hp=0;this.hpPrev=0;
+        this.vibRate=4.4+Math.random()*1.2;this.vibPhase=Math.random()*6.283;this.vibDepth=o.vibDepth!=null?o.vibDepth:0.006;
+        this.breath=o.breath!=null?o.breath:0.02;this.tense=0.85;
+        this.setShape(o.shape||{tongueIndex:0.4,tongueDiameter:2.2,lip:1.3});
+        this.port.onmessage=(e)=>{if(e.data.shape)this.setShape(e.data.shape);if(e.data.breath!=null)this.breath=e.data.breath;};}
+      setShape(s){const N=this.N;
+        for(let i=0;i<N;i++){const x=i/(N-1);
+          let d=1.5;                                   // rest profile
+          if(x<0.18)d=0.7+x/0.18*0.8;                  // glottal end narrows
+          const ti=s.tongueIndex,tw=0.22;              // tongue constriction (Gaussian dip)
+          d-= (s.tongueDiameter>0? (1.9-s.tongueDiameter):0)*Math.exp(-Math.pow((x-ti)/tw,2));
+          if(x>0.86)d=Math.min(d,s.lip);               // lip aperture
+          this.diam[i]=Math.max(0.05,d);}
+        // reflection coefficients from areas (A ~ diam^2)
+        for(let i=1;i<N;i++){const a1=this.diam[i-1]*this.diam[i-1],a2=this.diam[i]*this.diam[i];
+          this.k[i]=(a1-a2)/(a1+a2+1e-6);}
+        this.k[0]=this.glottalRefl;this.k[N]=this.lipRefl;}
+      glottal(ph,tense){ // Rosenberg-like pulse, tenseness shapes it
+        const tp=0.6,tn=0.16;
+        if(ph<tp)return tense*(3*(ph/tp)*(ph/tp)-2*(ph/tp)*(ph/tp)*(ph/tp));
+        if(ph<tp+tn){const u=(ph-tp)/tn;return tense*(1-u*u);}
+        return 0;}
+      step(gl){const N=this.N,R=this.R,L=this.L,jR=this.jR,jL=this.jL,k=this.k;
+        jR[0]=L[0]*this.glottalRefl+gl;
+        for(let i=1;i<N;i++){const w=k[i]*(R[i-1]+L[i]);jR[i]=R[i-1]-w;jL[i-1]=L[i]+w;}
+        jL[N-1]=R[N-1]*this.lipRefl;
+        for(let i=0;i<N;i++){R[i]=jR[i]*0.9995;L[i]=jL[i]*0.9995;}
+        return R[N-1];}
+      process(inp,outp,p){const out=outp[0][0];if(!out)return true;const fA=p.frequency,lA=p.level,n=out.length,T=6.283185307;
+        for(let i=0;i<n;i++){const lvl=lA.length>1?lA[i]:lA[0];let f0=fA.length>1?fA[i]:fA[0];
+          this.vibPhase+=T*this.vibRate/this.sr;if(this.vibPhase>T)this.vibPhase-=T;f0*=1+Math.sin(this.vibPhase)*this.vibDepth;
+          this.phase+=f0/this.sr;if(this.phase>=1)this.phase-=1;
+          let g=this.glottal(this.phase,this.tense);if(this.breath>0)g+=(Math.random()*2-1)*this.breath;
+          g*=lvl;
+          let o1=this.step(g);o1=this.step(g);        // 2x oversample for bandwidth/stability
+          // radiation highpass (lip differentiation)
+          const hp=o1-this.hpPrev+0.995*this.hp;this.hp=hp;this.hpPrev=o1;
+          out[i]=hp*lvl*0.6;}
+        return true;}}
+    registerProcessor('tract-voice',TractVoiceProcessor);`;
+
+    // Worklet readiness is tracked PER AudioContext (a context can only use
+    // worklets whose modules were added to it), so the library is safe even if
+    // an app builds more than one context.
+    async function init(ctx) {
+        if (ctx.__vocalWorklets) return true;
+        try {
+            for (const src of [FOF_SRC, TRACT_SRC]) {
+                const url = URL.createObjectURL(new Blob([src], { type: 'application/javascript' }));
+                await ctx.audioWorklet.addModule(url);
+            }
+            ctx.__vocalWorklets = true;
+        } catch (e) {
+            ctx.__vocalWorklets = false;
+        }
+        return !!ctx.__vocalWorklets;
+    }
+
+    function hasWorklets(ctx) { return !!(ctx && ctx.__vocalWorklets); }
+
+    // Build a PeriodicWave whose harmonic amplitudes trace the formant envelope
+    // at a given fundamental (used by the 'additive' technique).
+    function formantWave(ctx, f0, formants) {
+        const nyq = ctx.sampleRate / 2;
+        const K = Math.max(4, Math.min(64, Math.floor(nyq / f0)));
+        const real = new Float32Array(K + 1), imag = new Float32Array(K + 1);
+        for (let k = 1; k <= K; k++) {
+            const fh = k * f0;
+            let amp = 0;
+            for (const fm of formants) {
+                const d = (fh - fm.f) / (fm.bw * 0.5);
+                amp += fm.a / (1 + d * d);                 // Lorentzian formant peak
+            }
+            amp *= Math.pow(k, -0.35);                      // gentle source tilt
+            imag[k] = amp;
+        }
+        return ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+    }
+
+    function glottalWave(ctx) {
+        const n = 40, real = new Float32Array(n), imag = new Float32Array(n);
+        for (let k = 1; k < n; k++) imag[k] = 1 / Math.pow(k, 1.2);
+        return ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+    }
+
+    // ── The voice factory ───────────────────────────────────────────────────────
+    function create(ctx, opts) {
+        opts = opts || {};
+        const technique = opts.technique || 'fof';
+        const vowelName = opts.vowel || 'a';
+        const detuneCents = opts.detuneCents || 0;
+        const detuneFactor = Math.pow(2, detuneCents / 1200);
+        const breath = opts.breath != null ? opts.breath : 0.06;
+        const vibDepth = opts.vibDepth != null ? opts.vibDepth : 0.006;
+
+        if ((technique === 'fof' || technique === 'tract') && ctx.__vocalWorklets) {
+            const name = technique === 'fof' ? 'fof-voice' : 'tract-voice';
+            const processorOptions = technique === 'fof'
+                ? { formants: VOWELS[vowelName], breath, vibDepth, jitter: 0.03 }
+                : { shape: TRACT_VOWELS[vowelName], breath: breath * 0.4, vibDepth };
+            const node = new AudioWorkletNode(ctx, name, { numberOfInputs: 0, outputChannelCount: [1], processorOptions });
+            const freqParam = node.parameters.get('frequency');
+            const levelParam = node.parameters.get('level');
+            return {
+                technique, output: node,
+                setFrequency(f, t, glide) {
+                    const target = f * detuneFactor;
+                    freqParam.cancelScheduledValues(t);
+                    if (glide && glide > 0) { freqParam.setValueAtTime(freqParam.value || target, t); freqParam.exponentialRampToValueAtTime(Math.max(1, target), t + glide); }
+                    else freqParam.setValueAtTime(target, t);
+                },
+                setLevel(v, t) { levelParam.cancelScheduledValues(t); levelParam.setValueAtTime(v, t); },
+                setVowel(name2, t) {
+                    if (technique === 'fof') node.port.postMessage({ formants: VOWELS[name2] });
+                    else node.port.postMessage({ shape: TRACT_VOWELS[name2] });
+                },
+                dispose() { try { node.disconnect(); } catch (e) {} }
+            };
+        }
+
+        // Native-node techniques: 'formant' and 'additive' (also the fallback).
+        const out = ctx.createGain(); out.gain.value = 1;
+        const osc = ctx.createOscillator();
+        let formants = VOWELS[vowelName];
+
+        if (technique === 'additive') {
+            osc.setPeriodicWave(formantWave(ctx, 200, formants));
+        } else { // 'formant'
+            osc.setPeriodicWave(glottalWave(ctx));
+        }
+        osc.detune.value = detuneCents;
+
+        let bands = null, lastF0 = 200;
+        if (technique === 'formant') {
+            bands = formants.map((fm) => {
+                const bp = ctx.createBiquadFilter(); bp.type = 'bandpass';
+                bp.frequency.value = fm.f; bp.Q.value = fm.f / fm.bw;
+                const g = ctx.createGain(); g.gain.value = fm.a;
+                osc.connect(bp); bp.connect(g); g.connect(out);
+                return { bp, g, bw: fm.bw };
+            });
+        } else {
+            osc.connect(out);
+        }
+        osc.start(ctx.currentTime);
+
+        return {
+            technique, output: out,
+            setFrequency(f, t, glide) {
+                const target = f * detuneFactor;
+                if (glide && glide > 0) { osc.frequency.setValueAtTime(osc.frequency.value || target, t); osc.frequency.exponentialRampToValueAtTime(Math.max(1, target), t + glide); }
+                else osc.frequency.setValueAtTime(target, t);
+                if (technique === 'additive' && Math.abs(f - lastF0) > lastF0 * 0.02) {
+                    lastF0 = f; try { osc.setPeriodicWave(formantWave(ctx, f, formants)); } catch (e) {}
+                }
+            },
+            setLevel(v, t) { out.gain.cancelScheduledValues(t); out.gain.setValueAtTime(v, t); },
+            setVowel(name2, t) {
+                formants = VOWELS[name2];
+                if (technique === 'formant' && bands) {
+                    bands.forEach((b, i) => { b.bp.frequency.setValueAtTime(formants[i].f, t); b.bp.Q.setValueAtTime(formants[i].f / formants[i].bw, t); b.g.gain.setValueAtTime(formants[i].a, t); });
+                } else if (technique === 'additive') {
+                    try { osc.setPeriodicWave(formantWave(ctx, lastF0, formants)); } catch (e) {}
+                }
+            },
+            dispose() { try { osc.stop(); } catch (e) {} try { out.disconnect(); } catch (e) {} }
+        };
+    }
+
+    const TECHNIQUES = [
+        { id: 'fof',      name: 'FOF (CHANT)',    blurb: 'Overlapping formant grains, one burst per glottal pulse — the IRCAM CHANT method.' },
+        { id: 'formant',  name: 'Formant filter', blurb: 'A glottal-pulse oscillator through parallel resonant band-pass formants (source–filter).' },
+        { id: 'additive', name: 'Additive',       blurb: 'A sum of harmonics whose amplitudes trace the vowel formant envelope (spectral).' },
+        { id: 'tract',    name: 'Vocal tract',    blurb: 'A Kelly–Lochbaum waveguide of the vocal tract, excited by a glottal pulse (physical model).' }
+    ];
+
+    global.VocalVoices = { init, hasWorklets, create, VOWELS, TRACT_VOWELS, TECHNIQUES };
+})(typeof self !== 'undefined' ? self : this);
+
+</script>
+    <script>
+/**
  * Troubadour Song Synthesis Engine — a SUNG melody over an instrumental drone
  *
  * Historically the troubadour or trouvère SANG the canso; the vielle or citole
- * only accompanied. So the melodic lead here is a human VOICE, built with the
- * classic source–filter (formant) technique, while the drone beneath stays an
- * instrument, made subtractively.
+ * only accompanied. So the melodic lead here is a human VOICE, sung with the
+ * shared `vocal-voices.js` vocal-synthesis library, while the drone beneath
+ * stays an instrument, made subtractively.
  *
- *   - VOICE (the sung lyric line) : a glottal pulse — a custom PeriodicWave whose
- *                harmonics roll off ~12 dB/octave, like flow through vibrating
- *                vocal folds — shaped by a bank of four parallel resonant
- *                band-pass "formants" that sing recognisable vowels (a e i o u).
- *                Each singer keeps a persistent vocal tract; only the pitch (the
- *                fold frequency) changes note to note, exactly as in real singing.
- *                Light vibrato blooms on held notes and neighbouring pitches glide
- *                legato, for an expressive, haunting solo canso line. The Ensemble
- *                control (Solo / Duo / Ensemble) layers extra detuned, jittered
- *                singers.
+ *   - VOICE (the sung lyric line) : the `vocal-voices.js` library (default
+ *                technique FOF — Fonction d'Onde Formantique, the IRCAM CHANT
+ *                method): a burst of overlapping formant grains per glottal
+ *                period reconstructs a true sung vocal spectrum with real vowel
+ *                formants (a e i o u). Each singer is a persistent library voice;
+ *                only the pitch and vowel change note to note, exactly as in real
+ *                singing. Held notes bloom with vibrato and neighbouring pitches
+ *                glide legato, for an expressive, haunting solo canso line. The
+ *                Ensemble control (Solo / Duo / Ensemble) layers extra detuned,
+ *                jittered singers.
  *
  *   - DRONE (the accompaniment)   : a sustained open fifth (tonic + fifth) held
  *                SUBTRACTIVELY — detuned sawtooth oscillators through a gently
@@ -436,6 +705,7 @@ class TroubadourEngine {
         this.activeNotes = [];
 
         this.masterGain = null;
+        this.limiter = null;
         this.mixBus = null;
         this.melodyBus = null;
         this.voiceTone = null;          // high-shelf: vocal "brightness"
@@ -443,7 +713,6 @@ class TroubadourEngine {
         this.dryGain = null;
         this.convolver = null;
         this.analyser = null;
-        this.glottalWave = null;
 
         // G3 — a lyric voice register for the sung canso.
         this.basePitch = 196;
@@ -485,7 +754,13 @@ class TroubadourEngine {
 
         this.masterGain = this.ctx.createGain();
         this.masterGain.gain.value = 0.8;
-        this.masterGain.connect(this.ctx.destination);
+
+        // Soft limiter before the destination keeps voice + drone from clipping.
+        this.limiter = this.ctx.createDynamicsCompressor();
+        this.limiter.threshold.value = -8; this.limiter.knee.value = 8;
+        this.limiter.ratio.value = 6; this.limiter.attack.value = 0.004; this.limiter.release.value = 0.25;
+        this.masterGain.connect(this.limiter);
+        this.limiter.connect(this.ctx.destination);
 
         this.analyser = this.ctx.createAnalyser();
         this.analyser.fftSize = 2048;
@@ -528,19 +803,8 @@ class TroubadourEngine {
         this.droneBus.gain.value = 0;
         this.droneBus.connect(this.mixBus);
 
-        this.buildGlottalWave();
-    }
-
-    /**
-     * The glottal source: harmonics rolling off ~ -12 dB/oct. A little richer
-     * than a sawtooth so the higher formants have partials to resonate.
-     */
-    buildGlottalWave() {
-        const n = 48;
-        const real = new Float32Array(n);
-        const imag = new Float32Array(n);
-        for (let k = 1; k < n; k++) imag[k] = 1 / Math.pow(k, 1.2);   // spectral tilt
-        this.glottalWave = this.ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+        // Load the vocal-synthesis worklets (FOF, vocal tract) once.
+        await VocalVoices.init(this.ctx);
     }
 
     /** Warm great-chamber / hall — ~3.5 s tail with early reflections. */
@@ -636,16 +900,12 @@ class TroubadourEngine {
     // === Singers (the sung lyric line) ===
 
     /**
-     * Build one singer's persistent vocal tract:
-     *   sourceGain → [4 parallel band-pass formants] → outGain → melodyBus
-     * Note oscillators (the folds) connect transiently into sourceGain; breath
-     * noise adds air. Only the pitch changes per note — the tract persists.
+     * Build one singer as a persistent FOF library voice:
+     *   voice.output → noteGain (per-note envelope) → outGain (fade-in) → melodyBus
+     * Only the pitch and vowel change per note — the singer persists.
      */
     createVoice(index, total) {
         const now = this.ctx.currentTime;
-
-        const sourceGain = this.ctx.createGain();
-        sourceGain.gain.value = 1.0;
 
         const outGain = this.ctx.createGain();
         const perVoice = [0.55, 0.4, 0.32, 0.28];
@@ -654,41 +914,24 @@ class TroubadourEngine {
         outGain.gain.linearRampToValueAtTime(vol, now + 1.2 + index * 0.4);
         outGain.connect(this.melodyBus);
 
-        // Four parallel formant resonators, tuned to the opening vowel.
-        const formantGainsRel = [1.0, 0.5, 0.28, 0.16];
-        const bandwidths = [80, 90, 120, 150];
-        const formants = [];
-        const v0 = this.vowels[this.vowelSequence[0]];
-        for (let f = 0; f < 4; f++) {
-            const bp = this.ctx.createBiquadFilter();
-            bp.type = 'bandpass';
-            bp.frequency.value = v0[f];
-            bp.Q.value = v0[f] / bandwidths[f];
-            const fg = this.ctx.createGain();
-            fg.gain.value = formantGainsRel[f];
-            sourceGain.connect(bp);
-            bp.connect(fg);
-            fg.connect(outGain);
-            formants.push({ bp, fg, bandwidth: bandwidths[f] });
-        }
-
-        // Breath — filtered noise for air, gated softly with the sung tone.
-        const noiseBuf = this.ctx.createBuffer(1, this.ctx.sampleRate * 2, this.ctx.sampleRate);
-        const nd = noiseBuf.getChannelData(0);
-        for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-        const noise = this.ctx.createBufferSource();
-        noise.buffer = noiseBuf; noise.loop = true;
-        const noiseBp = this.ctx.createBiquadFilter();
-        noiseBp.type = 'bandpass'; noiseBp.frequency.value = 2600; noiseBp.Q.value = 0.7;
-        const noiseGain = this.ctx.createGain();
-        noiseGain.gain.value = 0;
-        noise.connect(noiseBp); noiseBp.connect(noiseGain); noiseGain.connect(sourceGain);
-        noise.start(now);
+        // Per-note amplitude envelope, shared by this singer across notes.
+        const noteGain = this.ctx.createGain();
+        noteGain.gain.value = 0.0001;
+        noteGain.connect(outGain);
 
         // Per-singer pitch drift so a unison ensemble shimmers.
         const detuneCents = (index - (total - 1) / 2) * 9 + (Math.random() - 0.5) * 5;
 
-        return { sourceGain, outGain, formants, noise, noiseGain, detuneCents, vowel: this.vowelSequence[0] };
+        const voice = VocalVoices.create(this.ctx, {
+            technique: 'fof',
+            vowel: this.vowelSequence[0],
+            detuneCents,
+            breath: 0.03 + this.breath * 0.07,
+            vibDepth: 0.007
+        });
+        voice.output.connect(noteGain);
+
+        return { voice, noteGain, outGain, detuneCents, vowel: this.vowelSequence[0] };
     }
 
     setupVoices() {
@@ -705,23 +948,17 @@ class TroubadourEngine {
                 voice.outGain.gain.cancelScheduledValues(now);
                 voice.outGain.gain.setValueAtTime(voice.outGain.gain.value, now);
                 voice.outGain.gain.linearRampToValueAtTime(0, now + 1.5);
-                setTimeout(() => { try { voice.noise.stop(); } catch (e) {} }, 1800);
+                const v = voice.voice;
+                setTimeout(() => { try { v.dispose(); } catch (e) {} }, 1800);
             } catch (e) {}
         }
         this.voices = [];
     }
 
-    /** Ramp a singer's formant bank toward a new vowel (vocal-tract transition). */
+    /** Morph a singer's library voice toward a new sung vowel. */
     setVowel(voice, vowel) {
-        const target = this.vowels[vowel];
-        if (!target) return;
-        const now = this.ctx.currentTime;
-        voice.formants.forEach((fm, f) => {
-            fm.bp.frequency.cancelScheduledValues(now);
-            fm.bp.frequency.setValueAtTime(fm.bp.frequency.value, now);
-            fm.bp.frequency.linearRampToValueAtTime(target[f], now + 0.12);
-            fm.bp.Q.setValueAtTime(Math.max(0.5, target[f] / fm.bandwidth), now + 0.12);
-        });
+        if (!this.vowels[vowel]) return;
+        voice.voice.setVowel(vowel, this.ctx.currentTime);
         voice.vowel = vowel;
     }
 
@@ -839,10 +1076,10 @@ class TroubadourEngine {
     }
 
     /**
-     * Sing one note across every singer in the ensemble: a glottal-pulse fold
-     * oscillator through a per-note amplitude envelope into that singer's formant
-     * tract (voice.sourceGain). Neighbouring pitches glide legato; held notes
-     * bloom with light vibrato; breath swells with the tone.
+     * Sing one note across every singer in the ensemble by steering each singer's
+     * persistent FOF library voice (pitch + vowel) and re-shaping its shared
+     * per-note amplitude envelope. Neighbouring pitches glide legato; the library
+     * adds its own light vibrato and breath.
      */
     playMelodyNote(freq, duration, delay, vowel, slideFrom) {
         if (!isFinite(freq) || freq <= 0) return;
@@ -850,56 +1087,24 @@ class TroubadourEngine {
         for (const voice of this.voices) {
             this.setVowel(voice, vowel);
 
-            const osc = this.ctx.createOscillator();
-            osc.setPeriodicWave(this.glottalWave);
-            const jitter = (Math.random() - 0.5) * 6;               // pitch shimmer of a real voice
-            osc.detune.value = voice.detuneCents + jitter;
-
-            if (slideFrom && isFinite(slideFrom)) {
-                osc.frequency.setValueAtTime(slideFrom, t0);
-                osc.frequency.exponentialRampToValueAtTime(freq, t0 + Math.min(0.14, duration * 0.45));
+            const glide = (slideFrom && isFinite(slideFrom)) ? Math.min(0.14, duration * 0.45) : 0;
+            if (glide > 0) {
+                voice.voice.setFrequency(slideFrom, t0, 0);
+                voice.voice.setFrequency(freq, t0, glide);
             } else {
-                osc.frequency.setValueAtTime(freq, t0);
+                voice.voice.setFrequency(freq, t0, 0);
             }
+            voice.voice.setLevel(1, t0);
 
-            const gain = this.ctx.createGain();
+            const g = voice.noteGain.gain;
             const attack = Math.min(0.16, duration * 0.35);
             const release = Math.max(0.22, duration * 0.55);
             const peak = 0.9;
-            gain.gain.setValueAtTime(0.0001, t0);
-            gain.gain.linearRampToValueAtTime(peak, t0 + attack);
-            gain.gain.setValueAtTime(peak * 0.9, t0 + Math.max(attack, duration * 0.7));
-            gain.gain.exponentialRampToValueAtTime(0.0008, t0 + duration + release);
-
-            osc.connect(gain);
-            gain.connect(voice.sourceGain);
-
-            // Light vibrato blooms on longer, held notes only.
-            if (duration > 0.5) {
-                const vib = this.ctx.createOscillator();
-                vib.type = 'sine';
-                vib.frequency.value = 4.8 + Math.random() * 1.2;
-                const vibDepth = this.ctx.createGain();
-                vibDepth.gain.value = freq * 0.007;
-                vib.connect(vibDepth); vibDepth.connect(osc.frequency);
-                vib.start(t0 + attack); vib.stop(t0 + duration + release);
-            }
-
-            // Breath swells with the sung note.
-            voice.noiseGain.gain.cancelScheduledValues(t0);
-            voice.noiseGain.gain.setValueAtTime(voice.noiseGain.gain.value, t0);
-            voice.noiseGain.gain.linearRampToValueAtTime(0.06 * this.breath, t0 + attack);
-            voice.noiseGain.gain.linearRampToValueAtTime(0.01 * this.breath, t0 + duration + release);
-
-            osc.start(t0);
-            osc.stop(t0 + duration + release + 0.1);
-
-            const node = { osc, gain };
-            this.activeNotes.push(node);
-            setTimeout(() => {
-                const idx = this.activeNotes.indexOf(node);
-                if (idx > -1) this.activeNotes.splice(idx, 1);
-            }, (duration + release + 0.2 + (delay || 0)) * 1000);
+            g.cancelScheduledValues(t0);
+            g.setValueAtTime(Math.max(0.0001, g.value), t0);
+            g.linearRampToValueAtTime(peak, t0 + attack);
+            g.setValueAtTime(peak * 0.9, t0 + Math.max(attack, duration * 0.7));
+            g.exponentialRampToValueAtTime(0.0008, t0 + duration + release);
         }
     }
 

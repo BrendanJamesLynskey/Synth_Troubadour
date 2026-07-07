@@ -1,6 +1,6 @@
 # Synth Troubadour — Courtly Song Synthesizer
 
-A web-based synthesizer that sings the **courtly songs of the troubadours** in real time in the browser. No samples, no libraries — a haunting solo voice sings the melody with **formant vocal synthesis (the sung melody) over a subtractive-synth vielle drone**, using only the Web Audio API.
+A web-based synthesizer that sings the **courtly songs of the troubadours** in real time in the browser. No samples, no external dependencies — a haunting solo voice sings the melody with the shared **FOF vocal-synthesis** library ([`vocal-voices.js`](vocal-voices.js), the IRCAM *CHANT* method) **over a subtractive-synth vielle drone**, using only the Web Audio API.
 
 **[Launch the app](https://brendanjameslynskey.github.io/Synth_Troubadour/)** — auto-detects your device and recommends desktop or mobile.
 
@@ -14,12 +14,12 @@ Their songs took shape as the **canso** (love-song), the **dansa** and the livel
 
 ## How it sounds high quality
 
-Because the troubadour *sang*, the melody is a human **voice** built with the classic source–filter (formant) technique, while the drone beneath stays an instrument, made subtractively:
+Because the troubadour *sang*, the melody is a human **voice** built with the shared **FOF vocal-synthesis** library ([`vocal-voices.js`](vocal-voices.js), default technique **FOF** — the IRCAM *CHANT* method), while the drone beneath stays an instrument, made subtractively:
 
-- **Voice — source** — a glottal pulse (a custom `PeriodicWave` whose harmonics roll off ~12 dB/octave, like flow through vibrating vocal folds) is the sung tone's source, one per singer.
-- **Voice — formant filter** — four parallel resonant **band-pass** filters shape that pulse into recognisable vowels (a e i o u). Each singer keeps a persistent vocal tract; only the pitch (the fold frequency) changes from note to note, exactly as in real singing. Neighbouring pitches glide **legato** and held notes bloom with light **vibrato**, with filtered-noise breath for air.
+- **Voice — FOF grains** — once per glottal period a burst of overlapping damped formant **grains** is fired, reconstructing a true sung vocal spectrum with real vowel formants (a e i o u). It runs sample-accurately in an `AudioWorklet`.
+- **Voice — persistent singer** — each singer is a persistent library voice; only the pitch and vowel change from note to note, exactly as in real singing. Neighbouring pitches glide **legato** and held notes bloom with light **vibrato**, with the library's own breath for air.
 - **Drone** — a sustained open fifth (tonic + fifth), made **subtractively** (detuned saw oscillators through a gently resonant low-pass pad with a breathing cutoff), holds beneath the voice as a *vielle* or *citole* would drone beneath a sung *canso*.
-- **Ensemble** — the Solo / Duo / Ensemble control layers extra detuned, jittered singers over the lyric line, plus a warm **great-chamber convolution reverb** (~3.5 s tail with early reflections).
+- **Ensemble** — the Solo / Duo / Ensemble control layers extra detuned, jittered singers over the lyric line, with a soft limiter and a warm **great-chamber convolution reverb** (~3.5 s tail with early reflections).
 
 The melody itself is generated as an arch-shaped **canso** phrase in the chosen mode: it lifts from the finalis to a high point, dwells at the apex, then descends by step to cadence home — breathing between phrases, with occasional dance-song (*dansa*) lilt.
 
@@ -40,7 +40,7 @@ Plainsong ──► Organum ──► Ars Nova ──► (Renaissance polyphony)
 | [Synth Gregorian](https://github.com/BrendanJamesLynskey/Synth_Gregorian) | Plainsong | Source–filter formant vocal synthesis |
 | [Synth Organum](https://github.com/BrendanJamesLynskey/Synth_Organum) | Notre-Dame polyphony | FOF vocal synthesis in Pythagorean just intonation |
 | [Synth Ars Nova](https://github.com/BrendanJamesLynskey/Synth_ArsNova) | 14th-c. isorhythm | Formant vocal synthesis + isorhythmic talea/color |
-| **Synth Troubadour** (this) | Secular monophony | Formant vocal synthesis (the sung melody) over a subtractive-synth vielle drone |
+| **Synth Troubadour** (this) | Secular monophony | FOF vocal synthesis (shared `vocal-voices.js` library, the sung melody) over a subtractive-synth vielle drone |
 | [Synth Estampie](https://github.com/BrendanJamesLynskey/Synth_Estampie) | Medieval dance | Physical modelling (instrumental dance) |
 
 ## Quick start
@@ -60,7 +60,8 @@ Open <http://localhost:8080> and press **Begin Song**. Any static file server wo
 | `index.html` | Landing page — detects device, links to desktop or mobile |
 | `desktop.html` | Desktop web app |
 | `style.css` | Courtly-themed styles (rose, wine-red, gold) |
-| `troubadour-engine.js` | Formant vocal-synthesis engine (sung melody + subtractive vielle drone, Web Audio API) |
+| `vocal-voices.js` | Shared library of interchangeable vocal-synthesis engines (FOF, formant, additive, vocal-tract) |
+| `troubadour-engine.js` | Song engine driving `vocal-voices.js` (sung melody) + subtractive vielle drone (Web Audio API) |
 | `app.js` | UI controller, stave visualizer, rose petals |
 | `troubadour_mobile.html` | Self-contained mobile version (single file) |
 
