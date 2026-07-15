@@ -22,9 +22,13 @@
  *                resonant, breathing low-pass pad, as a vielle or citole would
  *                drone beneath a sung canso.
  *
- * On top: the 8 medieval church modes, phrase-based arch-shaped melodies (the
- * canso) with breathing between phrases, and a warm great-chamber convolution
- * reverb.
+ * The melody itself is a REAL troubadour song: "A chantar m'er de so qu'ieu
+ * non volria" by the Comtessa de Dia (c. 1175) — the only canso by a
+ * trobairitz (woman troubadour) to survive with its music, preserved in the
+ * Manuscrit du Roi (BnF fr. 844). It is sung in Mode 1 (Dorian on D) over a
+ * D–A vielle drone, mostly syllabically with short melismas, in the free
+ * declamatory rhythm of the canso, with breaths between phrases and a warm
+ * great-chamber convolution reverb.
  */
 
 class TroubadourEngine {
@@ -33,9 +37,9 @@ class TroubadourEngine {
         this.isPlaying = false;
         this.currentMode = 1;
         this.numVoices = 1;
-        this.tempo = 66;                // lyric pace, syllables-per-minute-ish
+        this.tempo = 104;               // syllables/min → ≈0.58 s a syllable (free canso declamation)
         this.voiceVolume = 0.75;        // melody / lyric line (the singer)
-        this.droneVolume = 0.4;         // sustained fifth beneath
+        this.droneVolume = 0.25;        // sustained fifth beneath, ~ -10 dB under the voice
         this.brightness = 0.5;          // vocal brightness / vowel openness (0..1)
         this.breath = 0.3;              // air on the sung tone
         this.reverbMix = 0.55;
@@ -57,8 +61,9 @@ class TroubadourEngine {
         this.convolver = null;
         this.analyser = null;
 
-        // G3 — a lyric voice register for the sung canso.
-        this.basePitch = 196;
+        // D3 — the drone tonic. The vielle holds the FINAL of Mode 1 (D) plus
+        // its fifth (A3 ≈ 220 Hz) beneath the whole song, which cadences on D.
+        this.basePitch = 146.83;
 
         // === The 8 medieval church modes ===
         // intervals: cents from the finalis; tenor: reciting-tone scale degree.
@@ -86,9 +91,37 @@ class TroubadourEngine {
         this.vowelSequence = ['a','e','a','o','i','e','a','o','u','e','a'];
         this.vowelPos = 0;
 
-        this.phrasePos = 0;
-        this.phrase = [];
-        this.lastFreq = null;           // for legato glides between neighbours
+        // === THE SONG: "A chantar m'er de so qu'ieu non volria" ===
+        // Comtessa de Dia, from the Manuscrit du Roi. Mode 1 (Dorian), final D4.
+        // Each inner array is ONE SYLLABLE of the lyric; two or three note names
+        // together are a short melisma sung legato on that syllable's vowel.
+        // The melody spans C4 (the subtonium touched below the final in
+        // phrase B) up to the single C5 climax in phrase D.
+        this.noteFreq = {
+            C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00,
+            A4: 440.00, Bb4: 466.16, B4: 493.88, C5: 523.25
+        };
+        this.songPhrases = {
+            // Phrase A — cadence on E
+            A: [['A4'], ['A4','G4'], ['F4'], ['F4','G4'], ['A4'], ['G4'],
+                ['F4','G4'], ['F4','E4'], ['D4'], ['F4','E4','D4'], ['E4']],
+            // Phrase B — cadence on D, the final (also closes the stanza)
+            B: [['C4'], ['D4'], ['E4'], ['F4','G4'], ['A4','G4'], ['F4','E4','D4'],
+                ['C4'], ['D4','E4'], ['F4'], ['E4','D4','C4'], ['D4']],
+            // Phrase C — cadence on F; the B is sung soft (B-flat), as the
+            // manuscript's mode allows.
+            C: [['A4'], ['A4'], ['A4','Bb4'], ['A4'], ['G4'], ['A4'], ['G4'],
+                ['F4','E4','D4'], ['E4'], ['F4']],
+            // Phrase D — the ONE melodic climax of the stanza (C5); cadence on E
+            D: [['F4'], ['F4'], ['A4'], ['C5'], ['B4'], ['A4'], ['G4'],
+                ['F4','E4'], ['D4'], ['F4','E4','D4'], ['E4']]
+        };
+        // Stanza form: frons (A B)(A B) + cauda C D, with the last line
+        // reusing B so every stanza ends home on the final, D.
+        this.stanzaForm = ['A', 'B', 'A', 'B', 'C', 'D', 'B'];
+
+        this.songSequence = [];         // flattened stanza: one entry per syllable
+        this.songPos = 0;
     }
 
     async init() {
@@ -267,7 +300,7 @@ class TroubadourEngine {
 
         const voice = VocalVoices.create(this.ctx, {
             technique: 'sampler',           // real recorded voice (was 'fof')
-            voice: 'male', ensemble: 1,     // a solo jongleur — one clean voice
+            voice: 'auto', ensemble: 1,     // a solo trobairitz — treble samples above F#4
             vowel: this.vowelSequence[0],
             detuneCents,
             breath: 0.03 + this.breath * 0.07,
@@ -306,13 +339,11 @@ class TroubadourEngine {
         voice.vowel = vowel;
     }
 
-    // === Melody generation: arch-shaped canso phrase ===
+    // === Melody: "A chantar m'er" — the surviving Comtessa de Dia canso ===
 
     start() {
         this.isPlaying = true;
-        this.phrasePos = 0;
-        this.lastFreq = null;
-        this.buildPhrase();
+        this.buildStanza();
         this.scheduleNote();
     }
 
@@ -335,86 +366,71 @@ class TroubadourEngine {
     }
 
     /**
-     * Compose a lyrical, arch-shaped canso phrase in the current mode: lift up
-     * from around the finalis toward a high point near the modal ceiling, then
-     * descend by step to cadence home. Flexible rhythm with an occasional
-     * dansa-like lilt and small slurred ornaments. Values are scale degrees.
+     * Lay out one full stanza of the canso as a flat list of syllables.
+     *
+     * Stanza form (the classic troubadour frons + cauda):
+     *
+     *     A B  A B  |  C D B
+     *
+     * — the final line reuses phrase B, so every stanza cadences home on the
+     * final, D. The LITERAL return of phrases A and B (exact melodic
+     * repetition) is what marks this as a troubadour canso rather than
+     * plainchant, so the phrases are quoted verbatim each time. The song is
+     * strophic: when the stanza ends, the singer rests a moment and begins
+     * the same melody again for the next stanza of the poem.
      */
-    buildPhrase() {
-        const m = this.modes[this.currentMode];
-        const top = Math.max(m.tenor + 1, m.up + 1);
-        const phrase = [];
-        const dansa = Math.random() < 0.4;   // some songs lilt like a dance
-
-        // Ascent: rise toward the phrase peak with light steps and a small leap.
-        let deg = 0;
-        phrase.push({ deg: 0, len: dansa ? 0.7 : 1.0 });
-        while (deg < top) {
-            const step = (Math.random() < 0.75) ? 1 : 2;
-            deg = Math.min(top, deg + step);
-            const len = dansa ? (phrase.length % 2 ? 0.5 : 0.9) : (0.7 + Math.random() * 0.4);
-            if (Math.random() < 0.28) {
-                phrase.push({ deg, len, neume: [deg, deg + 1, deg] });   // upper turn
-            } else {
-                phrase.push({ deg, len });
-            }
-        }
-        // Dwell on the peak — the emotional apex of the canso.
-        phrase.push({ deg: top, len: dansa ? 1.0 : 1.5 });
-
-        // Descent: mostly stepwise fall back to the finalis, breathing wider.
-        for (let d = top - 1; d >= 0; d--) {
-            if (Math.random() < 0.22 && d < top - 1) {
-                phrase.push({ deg: d, len: 0.8, neume: [d + 1, d] });    // slurred fall
-            } else {
-                phrase.push({ deg: d, len: dansa ? (d % 2 ? 0.6 : 0.9) : (0.8 + Math.random() * 0.4) });
-            }
-        }
-        phrase[phrase.length - 1].len = 2.4;   // lengthened final on the finalis
-
-        this.phrase = phrase;
-        this.phrasePos = 0;
-        // Advance the syllable vowel each phrase.
-        this.vowelPos = (this.vowelPos + 1) % this.vowelSequence.length;
+    buildStanza() {
+        const seq = [];
+        this.stanzaForm.forEach((name, li) => {
+            const phrase = this.songPhrases[name];
+            phrase.forEach((notes, si) => {
+                seq.push({
+                    notes,                               // 1–3 note names: a syllable, maybe a melisma
+                    phraseEnd: si === phrase.length - 1, // lengthen the cadence note + breathe after
+                    stanzaEnd: li === this.stanzaForm.length - 1 && si === phrase.length - 1
+                });
+            });
+        });
+        this.songSequence = seq;
+        this.songPos = 0;
     }
 
     scheduleNote() {
         if (!this.isPlaying) return;
-        const m = this.modes[this.currentMode];
-        const item = this.phrase[this.phrasePos];
-        const beat = 60 / this.tempo;
-        const vowel = this.vowelSequence[(this.vowelPos + this.phrasePos) % this.vowelSequence.length];
+        if (!this.songSequence.length) this.buildStanza();
+        const syl = this.songSequence[this.songPos];
 
-        const degToFreq = (deg) => {
-            const idx = ((deg % 8) + 8) % 8;
-            const oct = Math.floor(deg / 8);
-            return this.centsToFreq(m.intervals[idx]) * Math.pow(2, oct);
-        };
+        // One sung vowel per syllable, rotating through the Occitan-ish sequence.
+        const vowel = this.vowelSequence[this.vowelPos % this.vowelSequence.length];
+        this.vowelPos = (this.vowelPos + 1) % this.vowelSequence.length;
 
-        // A syllable may carry a small slur (several notes sung on one breath).
-        const notes = item.neume
-            ? item.neume.map(d => degToFreq(d))
-            : [degToFreq(item.deg)];
-        const syllableDur = beat * item.len;
-        const noteDur = syllableDur / notes.length;
+        // Free, declamatory canso rhythm — no metronomic grid. `tempo` is
+        // syllables per minute (~104 → ≈0.58 s a syllable) with a gentle ±7%
+        // humanising jitter; each phrase-final (cadence) note stretches ×1.75.
+        let syllableDur = (60 / this.tempo) * (1 + (Math.random() * 2 - 1) * 0.07);
+        if (syl.phraseEnd) syllableDur *= 1.75;
 
-        notes.forEach((freq, i) => {
-            const prev = i > 0 ? notes[i - 1] : this.lastFreq;
-            let slideFrom = null;
-            if (prev && isFinite(prev)) {
-                const r = freq / prev;
-                // Glide legato between neighbouring pitches (up to ~a whole tone).
-                if (r > 0.82 && r < 1.22 && Math.abs(r - 1) > 1e-4) slideFrom = prev;
-            }
-            this.playMelodyNote(freq, noteDur, i * noteDur, vowel, slideFrom);
+        // A melisma splits its syllable's time evenly across the notes, sung
+        // legato on the one vowel with a short (10–20 ms) portamento between
+        // them. Fresh syllables re-articulate — no glide across syllables.
+        const freqs = syl.notes.map((n) => this.noteFreq[n]);
+        const noteDur = syllableDur / freqs.length;
+        freqs.forEach((freq, i) => {
+            const slideFrom = i > 0 ? freqs[i - 1] : null;
+            const glideTime = slideFrom ? 0.012 + Math.random() * 0.008 : 0;
+            this.playMelodyNote(freq, noteDur, i * noteDur, vowel, slideFrom, glideTime);
         });
-        this.lastFreq = notes[notes.length - 1];
 
-        this.phrasePos++;
-        const phraseEnd = this.phrasePos >= this.phrase.length;
-        // Breathe at the end of a phrase; small lift between notes.
-        const pause = phraseEnd ? beat * 1.4 : beat * 0.06;
-        if (phraseEnd) { this.buildPhrase(); this.lastFreq = null; }
+        this.songPos++;
+        // Breathe after each phrase; rest longer between stanzas; only the
+        // tiniest lift between syllables within a phrase.
+        let pause = 0.02;
+        if (syl.stanzaEnd) {
+            pause = 1.0 + Math.random() * 0.5;   // strophic: begin the next stanza
+            this.buildStanza();
+        } else if (syl.phraseEnd) {
+            pause = 0.4 + Math.random() * 0.3;   // a singer's breath
+        }
 
         this.phraseTimeout = setTimeout(() => this.scheduleNote(), (syllableDur + pause) * 1000);
     }
@@ -425,13 +441,15 @@ class TroubadourEngine {
      * per-note amplitude envelope. Neighbouring pitches glide legato; the library
      * adds its own light vibrato and breath.
      */
-    playMelodyNote(freq, duration, delay, vowel, slideFrom) {
+    playMelodyNote(freq, duration, delay, vowel, slideFrom, glideTime) {
         if (!isFinite(freq) || freq <= 0) return;
         const t0 = this.ctx.currentTime + (delay || 0);
         for (const voice of this.voices) {
             this.setVowel(voice, vowel);
 
-            const glide = (slideFrom && isFinite(slideFrom)) ? Math.min(0.14, duration * 0.45) : 0;
+            const glide = (slideFrom && isFinite(slideFrom))
+                ? (glideTime > 0 ? glideTime : Math.min(0.14, duration * 0.45))
+                : 0;
             if (glide > 0) {
                 voice.voice.setFrequency(slideFrom, t0, 0);
                 voice.voice.setFrequency(freq, t0, glide);
@@ -464,9 +482,12 @@ class TroubadourEngine {
 
     end() { this.stop(); }
 
+    /**
+     * The historical melody is fixed in Mode 1 (Dorian on D) — the mode
+     * buttons remain for the UI but no longer alter the tune itself.
+     */
     setMode(mode) {
         this.currentMode = mode;
-        if (this.isPlaying) { this.buildPhrase(); }
     }
 
     setVoices(count) {
