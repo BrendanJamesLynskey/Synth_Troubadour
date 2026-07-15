@@ -1,6 +1,8 @@
 # Synth Troubadour — Courtly Song Synthesizer
 
-A web-based synthesizer that sings the **courtly songs of the troubadours** in real time in the browser. No samples, no external dependencies — a haunting solo voice sings the melody with the shared **FOF vocal-synthesis** library ([`vocal-voices.js`](vocal-voices.js), the IRCAM *CHANT* method) **over a subtractive-synth vielle drone**, using only the Web Audio API.
+A web-based synthesizer that sings the **courtly songs of the troubadours** in real time in the browser. A haunting solo voice sings the melody with **real recorded singing**: the shared [`vocal-voices.js`](vocal-voices.js) library plays actual sung vowels from the [**VocalSet**](https://zenodo.org/records/1193957) corpus (CC BY 4.0), pitch-mapped with **formant-preserving** TD-PSOLA, **over a subtractive-synth vielle drone**. (The earlier pure-synthesis engines, including FOF/*CHANT*, remain available.)
+
+> **Credit:** sampled voices derived from [**VocalSet**](https://zenodo.org/records/1193957) (Wilkins, Seetharaman, Wahl & Pardo, ISMIR 2018), CC BY 4.0.
 
 **[Launch the app](https://brendanjameslynskey.github.io/Synth_Troubadour/)** — auto-detects your device and recommends desktop or mobile.
 

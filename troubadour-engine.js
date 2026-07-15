@@ -266,7 +266,8 @@ class TroubadourEngine {
         const detuneCents = (index - (total - 1) / 2) * 9 + (Math.random() - 0.5) * 5;
 
         const voice = VocalVoices.create(this.ctx, {
-            technique: 'fof',
+            technique: 'sampler',           // real recorded voice (was 'fof')
+            voice: 'male', ensemble: 1,     // a solo jongleur — one clean voice
             vowel: this.vowelSequence[0],
             detuneCents,
             breath: 0.03 + this.breath * 0.07,

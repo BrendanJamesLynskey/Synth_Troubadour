@@ -3,6 +3,7 @@
  */
 
 const engine = new TroubadourEngine();
+if (typeof window !== "undefined") window.engine = engine;
 let animationId = null;
 let isSinging = false;
 
