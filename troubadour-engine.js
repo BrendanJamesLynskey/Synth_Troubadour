@@ -46,6 +46,13 @@
  *      "distant love" song of the Rudel legend, ABAB CDB, final C as notated
  *      in chansonnier R (elsewhere often given on D).
  *
+ * The singer PRONOUNCES the first stanza of each poem: every melodic syllable
+ * carries its Occitan text (the piece's `lyrics`, one line per form entry,
+ * one string per sung syllable), the sung vowel is the syllable's real
+ * nucleus mapped to the a/e/i/o/u formant bank, and the library's consonant
+ * articulator (`voice.articulate`) sounds each syllable's onset and coda
+ * consonants at its edges — melismas stay legato on the one vowel.
+ *
  * Pitches follow the manuscript readings as transcribed in the Troubadour
  * Melodies Database (troubadourmelodies.org, after van der Werf); liquescent
  * neumes are sung as light passing notes within the syllable's melisma. Each
@@ -297,7 +304,23 @@ class TroubadourEngine {
                     P3b: [['E4'], ['D4'], ['C4'], ['E4'], ['D4'], ['C4'], ['E4'],
                           ['G4'], ['G4'], ['E4'], ['F4'], ['E4','F4','E4','D4'], ['D4','C4']]
                 },
-                form: ['P1', 'P1', 'O', 'C', 'P3a', 'P3b']
+                form: ['P1', 'P1', 'O', 'C', 'P3a', 'P3b'],
+                // First stanza. The short -aya lines group onto the puncta:
+                // each 19-note punctum I carries three lines (5 + 5 + 9 sung
+                // syllables), ouvert and clos take one 9-syllable line each,
+                // and the paired punctum III lines are 13 sung syllables
+                // ("e jaya / e·m traya / vas vos, domna veraya..."). Every
+                // count matches the melody exactly — no padding or trimming.
+                lyrics: [
+                    ['Ka', 'len', 'da', 'ma', 'ya', 'ni', 'fueills', 'de', 'fa', 'ya',
+                     'ni', 'chans', "d'au", 'zell', 'ni', 'flors', 'de', 'gla', 'ya'],
+                    ['non', 'es', 'qem', 'pla', 'ya', 'pros', 'do', 'na', 'ga', 'ya',
+                     'tro', "q'un", 'is', 'nell', 'mes', 'sa', 'gier', 'a', 'ya'],
+                    ['del', 'vos', 'tre', 'bell', 'cors', 'qim', 're', 'tra', 'ya'],
+                    ['pla', 'zer', 'no', 'vell', "q'a", 'mors', "m'a", 'tra', 'ya'],
+                    ['e', 'ja', 'ya', 'em', 'tra', 'ya', 'vas', 'vos', 'dom', 'na', 've', 'ra', 'ya'],
+                    ['e', 'cha', 'ya', 'de', 'pla', 'yal', 'ge', 'los', 'anz', 'qem', "n'es", 'tra', 'ya']
+                ]
             },
             {
                 // "Lanquan li jorn son lonc en mai" — Jaufre Rudel, the song
@@ -322,7 +345,18 @@ class TroubadourEngine {
                     D: [['G4','A4','B4','C5'], ['B4'], ['A4'], ['G4'],
                         ['F4','G4','A4'], ['G4'], ['F4'], ['E4','D4','C4']]
                 },
-                form: ['A', 'B', 'A', 'B', 'C', 'D', 'B']
+                form: ['A', 'B', 'A', 'B', 'C', 'D', 'B'],
+                // First stanza — seven octosyllabic masculine lines, 8 sung
+                // syllables each, matching the 8-syllable phrases exactly.
+                lyrics: [
+                    ['Lan', 'quan', 'li', 'jorn', 'son', 'lonc', 'en', 'may'],
+                    ["m'es", 'bels', 'dous', 'chans', "d'au", 'zels', 'de', 'lonh'],
+                    ['e', 'quan', 'me', 'sui', 'par', 'titz', 'de', 'lai'],
+                    ['re', 'mem', 'bram', "d'un", 'a', 'mor', 'de', 'lonh'],
+                    ['vau', 'de', 'ta', 'lan', 'em', 'broncs', 'e', 'clis'],
+                    ['si', 'que', 'chans', 'ni', 'flors', "d'al", 'bes', 'pis'],
+                    ['nom', 'platz', 'plus', 'que', "l'i", 'verns', 'ge', 'latz']
+                ]
             }
         ];
 
@@ -551,6 +585,30 @@ class TroubadourEngine {
         voice.vowel = vowel;
     }
 
+    /**
+     * The vowel actually SUNG for a syllable of Occitan lyric — the nearest
+     * vowel in the a/e/i/o/u formant bank to the syllable's nucleus:
+     * ai/ei→e, au→a, ou/oi→o, ieu/eu/ue(i)→e, ui→u, iu→u, y-as-glide is a
+     * consonant ("ya" → a) but y-as-nucleus → i. "qu"/"gu" before e/i keep
+     * their u silent (que → e, gui → i). Returns null if no vowel found.
+     */
+    lyricVowel(text) {
+        if (!text) return null;
+        let s = text.toLowerCase().replace(/[^a-z]/g, '');   // drop apostrophes / punctuation
+        s = s.replace(/qu(?=[ei])/g, 'q').replace(/gu(?=[ei])/g, 'g'); // silent u
+        s = s.replace(/([aeiou])y/g, '$1i');                 // vocalic off-glide y → i (may → mai)
+        const m = s.match(/[aeiou]+/);                       // first vowel cluster = the nucleus
+        if (!m) return /y/.test(s) ? 'i' : null;             // bare y nucleus → i
+        const v = m[0];
+        const diph = {
+            ai: 'e', ei: 'e', au: 'a', ou: 'o', oi: 'o',
+            eu: 'e', ieu: 'e', ie: 'e', ue: 'e', uei: 'e',
+            ui: 'u', iu: 'u', io: 'o', ia: 'a', iei: 'e'
+        };
+        if (diph[v]) return diph[v];
+        return this.vowels[v[0]] ? v[0] : null;
+    }
+
     // === Melody: the troubadour repertoire (see the header for the pieces) ===
 
     /**
@@ -620,11 +678,14 @@ class TroubadourEngine {
      */
     buildStanza() {
         const seq = [];
+        const lyrics = this.currentPiece ? this.currentPiece.lyrics : null;
         this.stanzaForm.forEach((name, li) => {
             const phrase = this.songPhrases[name];
+            const line = lyrics ? lyrics[li] : null;    // the stanza line sung to this phrase
             phrase.forEach((notes, si) => {
                 seq.push({
                     notes,                               // 1–5 note names: a syllable, maybe a melisma
+                    text: line ? (line[si] || null) : null, // the sung syllable's Occitan text
                     sylIndex: si,                        // position in the phrase (drives the triple lilt)
                     phraseEnd: si === phrase.length - 1, // lengthen the cadence note + breathe after
                     stanzaEnd: li === this.stanzaForm.length - 1 && si === phrase.length - 1
@@ -640,9 +701,14 @@ class TroubadourEngine {
         if (!this.songSequence.length) this.buildStanza();
         const syl = this.songSequence[this.songPos];
 
-        // One sung vowel per syllable, rotating through the Occitan-ish sequence.
-        const vowel = this.vowelSequence[this.vowelPos % this.vowelSequence.length];
-        this.vowelPos = (this.vowelPos + 1) % this.vowelSequence.length;
+        // One sung vowel per syllable — the REAL vowel of the lyric syllable
+        // (Occitan nucleus mapped to the nearest bank vowel); textless
+        // syllables fall back to the rotating Occitan-ish sequence.
+        let vowel = this.lyricVowel(syl.text);
+        if (!vowel) {
+            vowel = this.vowelSequence[this.vowelPos % this.vowelSequence.length];
+            this.vowelPos = (this.vowelPos + 1) % this.vowelSequence.length;
+        }
 
         // Rhythm per GENRE — the two rhythmic worlds of the corpus:
         //
@@ -673,6 +739,21 @@ class TroubadourEngine {
         // them. Fresh syllables re-articulate — no glide across syllables.
         const freqs = syl.notes.map((n) => this.noteFreq[n]);
         const noteDur = syllableDur / freqs.length;
+
+        // Pronounce the syllable's CONSONANTS once per sung syllable: onset
+        // consonants are scheduled to END at the first note's start, coda
+        // consonants at the end of the LAST melisma note — so a melisma flows
+        // unbroken on the vowel and only the syllable's edges are articulated.
+        if (syl.text) {
+            const sylStart = this.ctx.currentTime;
+            const sylEnd = sylStart + syllableDur;
+            for (const voice of this.voices) {
+                if (voice.voice.articulate) {
+                    voice.voice.articulate(syl.text, sylStart, sylEnd, freqs[0]);
+                }
+            }
+        }
+
         freqs.forEach((freq, i) => {
             const slideFrom = i > 0 ? freqs[i - 1] : null;
             const glideTime = slideFrom ? 0.012 + Math.random() * 0.008 : 0;
