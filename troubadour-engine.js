@@ -22,13 +22,38 @@
  *                resonant, breathing low-pass pad, as a vielle or citole would
  *                drone beneath a sung canso.
  *
- * The melody itself is a REAL troubadour song: "A chantar m'er de so qu'ieu
- * non volria" by the Comtessa de Dia (c. 1175) — the only canso by a
- * trobairitz (woman troubadour) to survive with its music, preserved in the
- * Manuscrit du Roi (BnF fr. 844). It is sung in Mode 1 (Dorian on D) over a
- * D–A vielle drone, mostly syllabically with short melismas, in the free
- * declamatory rhythm of the canso, with breaths between phrases and a warm
- * great-chamber convolution reverb.
+ * The melodies are a REPERTOIRE of REAL troubadour songs — only about a tenth
+ * of the troubadour corpus survives with music, chiefly in chansonniers R
+ * (BnF fr. 22543), G (Milan) and W / X (the "Manuscrit du Roi" family) — and
+ * the five pieces here span the genres and forms of that surviving corpus:
+ *
+ *   1. CANSO  "A chantar m'er" (Comtessa de Dia, c. 1175) — the only canso by
+ *      a trobairitz to survive with music (Manuscrit du Roi, BnF fr. 844).
+ *      Frons + cauda form ABAB CDB, Dorian on D, free declamatory rhythm.
+ *   2. CANSO  "Can vei la lauzeta mover" (Bernart de Ventadorn) — the most
+ *      famous troubadour melody: through-composed (oda continua), eight
+ *      arching phrases, Dorian on D (chansonnier R, f.56v).
+ *   3. ALBA   "Reis glorios" (Guiraut de Bornelh) — the great dawn song:
+ *      paired opening phrases (AA) + cauda closing to the "l'alba" refrain
+ *      line, Dorian on D (chansonnier R, f.8v). Free rhythm.
+ *   4. ESTAMPIDA "Kalenda maya" (Raimbaut de Vaqueiras) — the classic
+ *      troubadour dance song (chansonnier R, f.62r): three PAIRED PUNCTA,
+ *      the second pair with OUVERT (open, on D) and CLOS (closed, on C)
+ *      endings, on final C — and, unlike the cansos, sung in a MEASURED
+ *      lilting triple meter (rhythmic mode I, long–short), the defensible
+ *      reading for a dance piece.
+ *   5. VERS/CANSO "Lanquan li jorn son lonc en mai" (Jaufre Rudel) — the
+ *      "distant love" song of the Rudel legend, ABAB CDB, final C as notated
+ *      in chansonnier R (elsewhere often given on D).
+ *
+ * Pitches follow the manuscript readings as transcribed in the Troubadour
+ * Melodies Database (troubadourmelodies.org, after van der Werf); liquescent
+ * neumes are sung as light passing notes within the syllable's melisma. Each
+ * piece re-tunes the vielle drone to its own FINAL + FIFTH, and on each new
+ * start the engine moves to the next piece of the repertoire (the UI's mode
+ * buttons choose a piece directly). Cansos and the alba keep the free
+ * declamatory rhythm of the grand chant; the estampida alone is measured,
+ * in a clear triple lilt — the two rhythmic worlds of the corpus.
  */
 
 class TroubadourEngine {
@@ -61,8 +86,10 @@ class TroubadourEngine {
         this.convolver = null;
         this.analyser = null;
 
-        // D3 — the drone tonic. The vielle holds the FINAL of Mode 1 (D) plus
-        // its fifth (A3 ≈ 220 Hz) beneath the whole song, which cadences on D.
+        // The drone tonic — the vielle holds the FINAL of the current piece
+        // plus its fifth beneath the whole song. Re-tuned per piece by
+        // loadNextPiece(): D3 (146.83 Hz, +A3) for the D-final pieces,
+        // C3 (130.81 Hz, +G3) for the C-final pieces.
         this.basePitch = 146.83;
 
         // === The 8 medieval church modes ===
@@ -91,34 +118,219 @@ class TroubadourEngine {
         this.vowelSequence = ['a','e','a','o','i','e','a','o','u','e','a'];
         this.vowelPos = 0;
 
-        // === THE SONG: "A chantar m'er de so qu'ieu non volria" ===
-        // Comtessa de Dia, from the Manuscrit du Roi. Mode 1 (Dorian), final D4.
-        // Each inner array is ONE SYLLABLE of the lyric; two or three note names
-        // together are a short melisma sung legato on that syllable's vowel.
-        // The melody spans C4 (the subtonium touched below the final in
-        // phrase B) up to the single C5 climax in phrase D.
+        // === THE REPERTOIRE: real troubadour melodies from the manuscripts ===
+        // Each inner array is ONE SYLLABLE of the lyric; several note names
+        // together are a melisma sung legato on that syllable's vowel.
+        // All melodies sit in the C4–D5 octave-plus of the sung line (well
+        // inside the sampled vocal bank, which tops out at F#5).
         this.noteFreq = {
             C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.00,
-            A4: 440.00, Bb4: 466.16, B4: 493.88, C5: 523.25
+            A4: 440.00, Bb4: 466.16, B4: 493.88, C5: 523.25, D5: 587.33
         };
-        this.songPhrases = {
-            // Phrase A — cadence on E
-            A: [['A4'], ['A4','G4'], ['F4'], ['F4','G4'], ['A4'], ['G4'],
-                ['F4','G4'], ['F4','E4'], ['D4'], ['F4','E4','D4'], ['E4']],
-            // Phrase B — cadence on D, the final (also closes the stanza)
-            B: [['C4'], ['D4'], ['E4'], ['F4','G4'], ['A4','G4'], ['F4','E4','D4'],
-                ['C4'], ['D4','E4'], ['F4'], ['E4','D4','C4'], ['D4']],
-            // Phrase C — cadence on F; the B is sung soft (B-flat), as the
-            // manuscript's mode allows.
-            C: [['A4'], ['A4'], ['A4','Bb4'], ['A4'], ['G4'], ['A4'], ['G4'],
-                ['F4','E4','D4'], ['E4'], ['F4']],
-            // Phrase D — the ONE melodic climax of the stanza (C5); cadence on E
-            D: [['F4'], ['F4'], ['A4'], ['C5'], ['B4'], ['A4'], ['G4'],
-                ['F4','E4'], ['D4'], ['F4','E4','D4'], ['E4']]
-        };
-        // Stanza form: frons (A B)(A B) + cauda C D, with the last line
-        // reusing B so every stanza ends home on the final, D.
-        this.stanzaForm = ['A', 'B', 'A', 'B', 'C', 'D', 'B'];
+
+        this.repertoire = [
+            {
+                // "A chantar m'er de so qu'ieu non volria" — Comtessa de Dia,
+                // Manuscrit du Roi (BnF fr. 844). Mode 1 (Dorian), final D4.
+                // The melody spans C4 (the subtonium touched below the final
+                // in phrase B) up to the single C5 climax in phrase D.
+                id: 'achantar',
+                title: "A chantar m'er",
+                composer: 'Comtessa de Dia',
+                genre: 'canso',
+                rhythm: 'free',
+                final: 146.83,          // drone D3 + A3
+                phrases: {
+                    // Phrase A — cadence on E
+                    A: [['A4'], ['A4','G4'], ['F4'], ['F4','G4'], ['A4'], ['G4'],
+                        ['F4','G4'], ['F4','E4'], ['D4'], ['F4','E4','D4'], ['E4']],
+                    // Phrase B — cadence on D, the final (also closes the stanza)
+                    B: [['C4'], ['D4'], ['E4'], ['F4','G4'], ['A4','G4'], ['F4','E4','D4'],
+                        ['C4'], ['D4','E4'], ['F4'], ['E4','D4','C4'], ['D4']],
+                    // Phrase C — cadence on F; the B is sung soft (B-flat), as
+                    // the manuscript's mode allows.
+                    C: [['A4'], ['A4'], ['A4','Bb4'], ['A4'], ['G4'], ['A4'], ['G4'],
+                        ['F4','E4','D4'], ['E4'], ['F4']],
+                    // Phrase D — the ONE melodic climax of the stanza (C5); cadence on E
+                    D: [['F4'], ['F4'], ['A4'], ['C5'], ['B4'], ['A4'], ['G4'],
+                        ['F4','E4'], ['D4'], ['F4','E4','D4'], ['E4']]
+                },
+                // Frons (A B)(A B) + cauda C D, the last line reusing B so
+                // every stanza ends home on the final, D.
+                form: ['A', 'B', 'A', 'B', 'C', 'D', 'B'],
+                // First stanza, syllabified — one line per form entry, one
+                // string per sung syllable. Lines 1–4 and 6 are feminine
+                // (10' = 11 sung syllables), line 5 masculine (10) — exactly
+                // the 11/11/11/11/10/11 syllables of phrases A B A B C D.
+                // Line 7 is a 10-syllable masculine line sung to the 11-note
+                // B phrase, so "s'ieu" is sung disyllabically (s'i-eu).
+                lyrics: [
+                    ['A', 'chan', 'tar', "m'er", 'de', 'so', "qu'ieu", 'non', 'vol', 'ri', 'a'],
+                    ['tant', 'me', 'ran', 'cur', 'de', 'lui', 'cui', 'sui', 'a', 'mi', 'a'],
+                    ['car', 'eu', "l'am", 'mais', 'que', 'nuil', 'la', 'ren', 'que', 'si', 'a'],
+                    ['vas', 'lui', 'nom', 'val', 'mer', 'ces', 'ni', 'cor', 'te', 'si', 'a'],
+                    ['ni', 'ma', 'bel', 'tatz', 'ni', 'mos', 'pretz', 'ni', 'mos', 'sens'],
+                    ["c'a", 'tres', 'sim', 'sui', 'en', 'ga', 'na', "d'e", 'tra', 'i', 'a'],
+                    ['com', 'degr', 'es', 'ser', "s'i", 'eu', 'fos', 'des', 'a', 'vi', 'nens']
+                ]
+            },
+            {
+                // "Can vei la lauzeta mover" — Bernart de Ventadorn,
+                // chansonnier R f.56v. The most famous of all troubadour
+                // melodies: through-composed (oda continua), eight arching
+                // phrases rising to the D5 peak in phrase 3, Dorian, final D4.
+                id: 'canvei',
+                title: 'Can vei la lauzeta mover',
+                composer: 'Bernart de Ventadorn',
+                genre: 'canso',
+                rhythm: 'free',
+                final: 146.83,          // drone D3 + A3
+                phrases: {
+                    P1: [['D4'], ['F4'], ['G4'], ['A4'], ['A4'], ['A4'],
+                         ['A4','G4','A4','B4'], ['A4','G4']],
+                    P2: [['G4'], ['A4'], ['B4'], ['C5'], ['B4'],
+                         ['A4','G4','F4'], ['G4'], ['A4']],
+                    // Phrase 3 — the lark's climb: the melodic peak, D5
+                    P3: [['C5'], ['D5'], ['C5','B4'], ['A4','G4'], ['A4','B4'],
+                         ['A4'], ['A4','G4'], ['A4','G4','F4']],
+                    P4: [['F4'], ['G4'], ['A4'], ['A4','B4','C5','B4'], ['G4'],
+                         ['E4'], ['F4'], ['E4','D4','E4']],
+                    P5: [['G4'], ['A4'], ['F4'], ['G4'], ['A4'], ['B4'],
+                         ['C5','B4','C5','D5'], ['G4']],
+                    P6: [['A4'], ['C5'], ['A4'], ['B4'], ['A4'], ['G4','F4'],
+                         ['G4','A4','G4','F4'], ['E4']],
+                    // Phrase 7 restates phrase 4's cadence material (the one
+                    // melodic rhyme in the oda continua)
+                    P7: [['F4'], ['G4'], ['A4'], ['A4','B4','C5','B4'], ['G4'],
+                         ['E4'], ['F4'], ['E4','D4','E4']],
+                    // Phrase 8 sinks to the final through the low C
+                    P8: [['E4'], ['G4'], ['A4','G4'], ['F4'], ['G4','F4'],
+                         ['E4','C4'], ['D4','E4'], ['F4','E4','D4']]
+                },
+                form: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8'],
+                // First stanza — eight octosyllabic lines, one per phrase,
+                // 8 sung syllables each (matching the melody exactly).
+                lyrics: [
+                    ['Can', 'vei', 'la', 'lau', 'ze', 'ta', 'mo', 'ver'],
+                    ['de', 'joi', 'sas', 'a', 'las', 'con', 'tral', 'rai'],
+                    ['que', "s'o", 'bli', "d'es", 'lais', 'sa', 'cha', 'zer'],
+                    ['per', 'la', 'dous', 'sor', "c'al", 'cor', 'li', 'vai'],
+                    ['ai', 'tan', 'grans', 'en', 've', 'ya', "m'en", 've'],
+                    ['de', 'cui', "qu'eu", 've', 'ya', 'jau', 'zi', 'on'],
+                    ['me', 'ra', 'vi', 'lhas', 'ai', 'car', 'des', 'se'],
+                    ['lo', 'cor', 'de', 'de', 'zi', 'rer', 'nom', 'fon']
+                ]
+            },
+            {
+                // "Reis glorios, verais lums e clartatz" — Guiraut de Bornelh,
+                // chansonnier R f.8v. THE alba (dawn song): the watchman sings
+                // till each stanza closes into the "et ades sera l'alba"
+                // refrain line. Paired opening phrases (A A) + cauda, Dorian,
+                // final D4, range C4–C5. Free declamatory rhythm.
+                id: 'reisglorios',
+                title: 'Reis glorios',
+                composer: 'Guiraut de Bornelh',
+                genre: 'alba',
+                rhythm: 'free',
+                final: 146.83,          // drone D3 + A3
+                phrases: {
+                    // A — sung TWICE (lines 1 and 2 share the melody): the
+                    // fifth-leap opening D–A that makes this alba instantly known
+                    A: [['D4'], ['D4'], ['A4'], ['A4'], ['A4','B4'], ['C5'],
+                        ['B4','A4','B4'], ['G4'], ['A4','B4','C5'], ['B4','A4']],
+                    // B — turns downward to the low register, cadence on C
+                    B: [['A4','G4','A4','B4'], ['A4'], ['G4','F4'], ['E4'], ['E4'],
+                        ['G4'], ['A4'], ['D4'], ['E4'], ['F4','E4','D4'], ['D4','C4']],
+                    // C — climbs from the low C and re-sounds the B-phrase peak
+                    C: [['C4'], ['D4'], ['E4'], ['F4','E4','D4'], ['A4','G4','A4','B4'],
+                        ['A4'], ['G4','F4'], ['E4'], ['F4'], ['G4','F4','E4','D4'], ['E4']],
+                    // R — the refrain line "et ades sera l'alba", home to D
+                    R: [['C4'], ['D4'], ['E4'], ['F4'], ['G4','A4','G4'],
+                        ['F4','E4','D4','E4','F4'], ['E4','D4']]
+                },
+                form: ['A', 'A', 'B', 'C', 'R'],
+                // First stanza — two decasyllabic lines on the paired A
+                // phrase (10 syllables each), two 10' feminine lines (11 sung)
+                // on B and C, then the 7-syllable "l'alba" refrain on R.
+                lyrics: [
+                    ['Reis', 'glo', 'ri', 'os', 've', 'rais', 'lums', 'e', 'clar', 'tatz'],
+                    ['Deus', 'po', 'de', 'ros', 'Se', 'nher', 'si', 'a', 'vos', 'platz'],
+                    ['al', 'meu', 'com', 'panh', 'si', 'atz', 'fi', 'zels', 'a', 'iu', 'da'],
+                    ["qu'eu", 'non', 'lo', 'vi', 'pos', 'la', 'nochs', 'fon', 'ven', 'gu', 'da'],
+                    ['et', 'a', 'des', 'se', 'ra', "l'al", 'ba']
+                ]
+            },
+            {
+                // "Kalenda maya" — Raimbaut de Vaqueiras, chansonnier R f.62r:
+                // the one troubadour ESTAMPIDA to survive with its music (the
+                // vida says Raimbaut set his words to an estampida two French
+                // jongleurs fiddled at the Montferrat court). Three PAIRED
+                // PUNCTA: the first punctum repeated exactly, the second with
+                // OUVERT (open, ending D) and CLOS (closed, ending C) endings,
+                // the third paired with varied close. Final C4, range C4–C5
+                // with the manuscript's B-flat inflection. Sung MEASURED, in
+                // a lilting triple meter (rhythmic mode I, long–short) — the
+                // dance rhythm that sets the estampida apart from the canso.
+                id: 'kalenda',
+                title: 'Kalenda maya',
+                composer: 'Raimbaut de Vaqueiras',
+                genre: 'estampida',
+                rhythm: 'triple',
+                tempoScale: 2.1,        // dance pulse ≈ 2× the canso syllable
+                final: 130.81,          // drone C3 + G3
+                phrases: {
+                    // Punctum I (sung twice, exact): rises through the B-flat
+                    // to the C5 peak, then falls the full octave to C4
+                    P1: [['E4'], ['G4'], ['G4'], ['A4','G4'], ['F4'], ['G4'],
+                         ['A4'], ['Bb4'], ['A4'], ['G4'], ['A4'], ['B4'], ['C5'],
+                         ['B4','A4'], ['G4'], ['E4'], ['F4'], ['E4','D4'], ['C4']],
+                    // Punctum II — OUVERT: the open ending, hanging on D
+                    O:  [['E4'], ['G4'], ['G4'], ['A4'], ['B4'], ['G4','F4'],
+                         ['F4'], ['E4','D4'], ['D4']],
+                    // Punctum II — CLOS: the same phrase closed onto the final C
+                    C:  [['E4'], ['G4'], ['A4'], ['B4'], ['B4'], ['G4','F4'],
+                         ['F4'], ['E4','D4'], ['C4']],
+                    // Punctum III (paired, close varied): the rocking E–D–C
+                    // figure of the "bella cavalhiera" lines
+                    P3a: [['E4'], ['D4'], ['C4'], ['E4'], ['D4'], ['C4'], ['E4'],
+                          ['G4'], ['G4'], ['E4'], ['F4','E4'], ['D4','C4'], ['C4']],
+                    P3b: [['E4'], ['D4'], ['C4'], ['E4'], ['D4'], ['C4'], ['E4'],
+                          ['G4'], ['G4'], ['E4'], ['F4'], ['E4','F4','E4','D4'], ['D4','C4']]
+                },
+                form: ['P1', 'P1', 'O', 'C', 'P3a', 'P3b']
+            },
+            {
+                // "Lanquan li jorn son lonc en mai" — Jaufre Rudel, the song
+                // of amor de lonh (love from afar), as notated in chansonnier
+                // R: final C4, range C4–C5 (other manuscripts give the melody
+                // a tone higher, on D). The same ABAB CDB frons-and-cauda form
+                // as "A chantar", with the cauda leaping to the high register.
+                id: 'lanquan',
+                title: 'Lanquan li jorn son lonc en mai',
+                composer: 'Jaufre Rudel',
+                genre: 'vers',
+                rhythm: 'free',
+                final: 130.81,          // drone C3 + G3
+                phrases: {
+                    A: [['C4','D4'], ['F4'], ['F4'], ['F4'], ['F4','E4'],
+                        ['E4','D4','C4','D4'], ['E4','D4','E4','F4'], ['E4','D4']],
+                    B: [['D4'], ['F4'], ['G4','F4','G4','A4'], ['G4'], ['F4'],
+                        ['E4','D4','C4','D4'], ['E4','D4','E4','F4'], ['E4','D4','C4']],
+                    // C — the cauda springs an octave up to the reciting C5
+                    C: [['G4','A4'], ['C5'], ['C5'], ['C5'], ['C5'],
+                        ['B4','A4','G4','A4'], ['B4','A4','B4','C5'], ['B4','A4','G4']],
+                    D: [['G4','A4','B4','C5'], ['B4'], ['A4'], ['G4'],
+                        ['F4','G4','A4'], ['G4'], ['F4'], ['E4','D4','C4']]
+                },
+                form: ['A', 'B', 'A', 'B', 'C', 'D', 'B']
+            }
+        ];
+
+        this.pieceIndex = 0;            // the NEXT piece the cycle will play
+        this.requestedPiece = null;     // set by the UI's piece (mode) buttons
+        this.currentPiece = null;
+        this.songPhrases = this.repertoire[0].phrases;
+        this.stanzaForm = this.repertoire[0].form;
 
         this.songSequence = [];         // flattened stanza: one entry per syllable
         this.songPos = 0;
@@ -339,10 +551,35 @@ class TroubadourEngine {
         voice.vowel = vowel;
     }
 
-    // === Melody: "A chantar m'er" — the surviving Comtessa de Dia canso ===
+    // === Melody: the troubadour repertoire (see the header for the pieces) ===
+
+    /**
+     * Advance to the next piece of the repertoire (or to the piece the UI
+     * requested) and re-point the song data and the drone tonic at it. The
+     * caller re-tunes/starts the drone so the vielle always holds the new
+     * piece's FINAL + FIFTH.
+     */
+    loadNextPiece() {
+        const n = this.repertoire.length;
+        const idx = this.requestedPiece != null
+            ? ((this.requestedPiece % n) + n) % n
+            : this.pieceIndex % n;
+        this.requestedPiece = null;
+        this.currentPiece = this.repertoire[idx];
+        this.pieceIndex = (idx + 1) % n;      // cycle: a different song next time
+        this.basePitch = this.currentPiece.final;
+        this.songPhrases = this.currentPiece.phrases;
+        this.stanzaForm = this.currentPiece.form;
+        this.songSequence = [];
+        this.songPos = 0;
+    }
 
     start() {
         this.isPlaying = true;
+        if (!this.currentPiece) {
+            this.loadNextPiece();
+            if (this.droneNodes.length) this.startDrone();   // re-tune the vielle
+        }
         this.buildStanza();
         this.scheduleNote();
     }
@@ -366,18 +603,20 @@ class TroubadourEngine {
     }
 
     /**
-     * Lay out one full stanza of the canso as a flat list of syllables.
+     * Lay out one full stanza of the current piece as a flat list of
+     * syllables, following the piece's own form:
      *
-     * Stanza form (the classic troubadour frons + cauda):
+     *   - "A chantar" / "Lanquan li jorn":  A B A B | C D B  (frons + cauda)
+     *   - "Can vei la lauzeta":             P1..P8 through-composed
+     *   - "Reis glorios" (alba):            A A B C R (R = the l'alba refrain)
+     *   - "Kalenda maya" (estampida):       P1 P1 | O C | P3a P3b — paired
+     *                                       puncta, ouvert then clos
      *
-     *     A B  A B  |  C D B
-     *
-     * — the final line reuses phrase B, so every stanza cadences home on the
-     * final, D. The LITERAL return of phrases A and B (exact melodic
-     * repetition) is what marks this as a troubadour canso rather than
-     * plainchant, so the phrases are quoted verbatim each time. The song is
-     * strophic: when the stanza ends, the singer rests a moment and begins
-     * the same melody again for the next stanza of the poem.
+     * The LITERAL return of whole phrases (exact melodic repetition) is what
+     * marks these as troubadour song rather than plainchant, so repeated
+     * phrases are quoted verbatim. Every piece is strophic: when the stanza
+     * ends, the singer rests a moment and begins the melody again for the
+     * next stanza of the poem.
      */
     buildStanza() {
         const seq = [];
@@ -385,7 +624,8 @@ class TroubadourEngine {
             const phrase = this.songPhrases[name];
             phrase.forEach((notes, si) => {
                 seq.push({
-                    notes,                               // 1–3 note names: a syllable, maybe a melisma
+                    notes,                               // 1–5 note names: a syllable, maybe a melisma
+                    sylIndex: si,                        // position in the phrase (drives the triple lilt)
                     phraseEnd: si === phrase.length - 1, // lengthen the cadence note + breathe after
                     stanzaEnd: li === this.stanzaForm.length - 1 && si === phrase.length - 1
                 });
@@ -404,11 +644,29 @@ class TroubadourEngine {
         const vowel = this.vowelSequence[this.vowelPos % this.vowelSequence.length];
         this.vowelPos = (this.vowelPos + 1) % this.vowelSequence.length;
 
-        // Free, declamatory canso rhythm — no metronomic grid. `tempo` is
-        // syllables per minute (~104 → ≈0.58 s a syllable) with a gentle ±7%
-        // humanising jitter; each phrase-final (cadence) note stretches ×1.75.
-        let syllableDur = (60 / this.tempo) * (1 + (Math.random() * 2 - 1) * 0.07);
-        if (syl.phraseEnd) syllableDur *= 1.75;
+        // Rhythm per GENRE — the two rhythmic worlds of the corpus:
+        //
+        //   'free'   (canso / alba / vers): free declamatory rhythm, no
+        //            metronomic grid. `tempo` is syllables per minute (~104 →
+        //            ≈0.58 s a syllable) with a gentle ±7% humanising jitter;
+        //            each phrase-final (cadence) note stretches ×1.75.
+        //
+        //   'triple' (estampida / dansa): MEASURED, a lilting triple meter —
+        //            rhythmic mode I (trochaic long–short): syllables
+        //            alternate 2 pulses + 1 pulse so each pair fills one
+        //            3-pulse bar, and every punctum cadence holds a full bar.
+        //            Only a hair of jitter: a dance keeps its grid.
+        const rhythm = this.currentPiece ? this.currentPiece.rhythm : 'free';
+        const tempoScale = (this.currentPiece && this.currentPiece.tempoScale) || 1;
+        let syllableDur;
+        if (rhythm === 'triple') {
+            const pulse = 60 / (this.tempo * tempoScale);
+            const pulses = syl.phraseEnd ? 3 : (syl.sylIndex % 2 === 0 ? 2 : 1);
+            syllableDur = pulse * pulses * (1 + (Math.random() * 2 - 1) * 0.015);
+        } else {
+            syllableDur = (60 / (this.tempo * tempoScale)) * (1 + (Math.random() * 2 - 1) * 0.07);
+            if (syl.phraseEnd) syllableDur *= 1.75;
+        }
 
         // A melisma splits its syllable's time evenly across the notes, sung
         // legato on the one vowel with a short (10–20 ms) portamento between
@@ -423,13 +681,17 @@ class TroubadourEngine {
 
         this.songPos++;
         // Breathe after each phrase; rest longer between stanzas; only the
-        // tiniest lift between syllables within a phrase.
+        // tiniest lift between syllables within a phrase. In the measured
+        // estampida the breath is METRICAL — exactly one pulse — so the dance
+        // never loses its step.
         let pause = 0.02;
         if (syl.stanzaEnd) {
             pause = 1.0 + Math.random() * 0.5;   // strophic: begin the next stanza
             this.buildStanza();
         } else if (syl.phraseEnd) {
-            pause = 0.4 + Math.random() * 0.3;   // a singer's breath
+            pause = rhythm === 'triple'
+                ? 60 / (this.tempo * tempoScale)     // one pulse of the bar
+                : 0.4 + Math.random() * 0.3;         // a singer's breath
         }
 
         this.phraseTimeout = setTimeout(() => this.scheduleNote(), (syllableDur + pause) * 1000);
@@ -475,19 +737,31 @@ class TroubadourEngine {
     async begin() {
         await this.init();
         if (this.ctx.state === 'suspended') await this.ctx.resume();
+        this.loadNextPiece();               // cycle the repertoire on each start
         this.setupVoices();
-        this.startDrone();
+        this.startDrone();                  // ...so the drone rises on the new final
         setTimeout(() => { if (!this.isPlaying) this.start(); }, 1500);
     }
 
     end() { this.stop(); }
 
     /**
-     * The historical melody is fixed in Mode 1 (Dorian on D) — the mode
-     * buttons remain for the UI but no longer alter the tune itself.
+     * The UI's mode buttons now choose the PIECE (each historical melody
+     * carries its own mode and final): 1 "A chantar", 2 "Can vei la lauzeta",
+     * 3 "Reis glorios", 4 "Kalenda maya", 5 "Lanquan li jorn" (higher numbers
+     * wrap around the repertoire). If the singer is mid-song, the new piece
+     * begins at once, the vielle re-tuning to its final.
      */
     setMode(mode) {
         this.currentMode = mode;
+        this.requestedPiece = (mode - 1) % this.repertoire.length;
+        if (this.isPlaying) {
+            if (this.phraseTimeout) { clearTimeout(this.phraseTimeout); this.phraseTimeout = null; }
+            this.loadNextPiece();
+            if (this.droneNodes.length) this.startDrone();   // re-tune the fifth
+            this.buildStanza();
+            this.scheduleNote();
+        }
     }
 
     setVoices(count) {
