@@ -1,6 +1,8 @@
 # Synth Troubadour — Courtly Song Synthesizer
 
-A web-based synthesizer that sings the **courtly songs of the troubadours** in real time in the browser. A haunting solo voice sings the melody with **real recorded singing**: the shared [`vocal-voices.js`](vocal-voices.js) library plays actual sung vowels from the [**VocalSet**](https://zenodo.org/records/1193957) corpus (CC BY 4.0), pitch-mapped with **formant-preserving** TD-PSOLA, **over a subtractive-synth vielle drone**. (The earlier pure-synthesis engines, including FOF/*CHANT*, remain available.)
+A web-based synthesizer that sings the **courtly songs of the troubadours** in real time in the browser. A haunting solo voice sings the melody with **real recorded singing**: the shared [`vocal-voices.js`](vocal-voices.js) library plays actual sung vowels from the [**VocalSet**](https://zenodo.org/records/1193957) corpus (CC BY 4.0), pitch-mapped by a **formant-preserving**, in-tune splice sampler with expressive vibrato and breath, **over a subtractive-synth vielle drone**.
+
+It sings a **repertoire of five real surviving troubadour melodies**, transcribed from the chansonniers and spanning the genres of the corpus: *A chantar m'er* (Comtessa de Dia — the only canso by a trobairitz to survive with music), *Can vei la lauzeta mover* (Bernart de Ventadorn), the alba *Reis glorios* (Guiraut de Bornelh), the estampida *Kalenda maya* (Raimbaut de Vaqueiras) and *Lanquan li jorn son lonc en mai* (Jaufre Rudel) — each in its genre-appropriate rhythm, with the first stanza's Occitan text pronounced syllable by syllable.
 
 > **Credit:** sampled voices derived from [**VocalSet**](https://zenodo.org/records/1193957) (Wilkins, Seetharaman, Wahl & Pardo, ISMIR 2018), CC BY 4.0.
 
@@ -16,14 +18,14 @@ Their songs took shape as the **canso** (love-song), the **dansa** and the livel
 
 ## How it sounds high quality
 
-Because the troubadour *sang*, the melody is a human **voice** built with the shared **FOF vocal-synthesis** library ([`vocal-voices.js`](vocal-voices.js), default technique **FOF** — the IRCAM *CHANT* method), while the drone beneath stays an instrument, made subtractively:
+Because the troubadour *sang*, the melody is a human **voice** from the shared **sampled-voice** library ([`vocal-voices.js`](vocal-voices.js)), while the drone beneath stays an instrument, made subtractively:
 
-- **Voice — FOF grains** — once per glottal period a burst of overlapping damped formant **grains** is fired, reconstructing a true sung vocal spectrum with real vowel formants (a e i o u). It runs sample-accurately in an `AudioWorklet`.
-- **Voice — persistent singer** — each singer is a persistent library voice; only the pitch and vowel change from note to note, exactly as in real singing. Neighbouring pitches glide **legato** and held notes bloom with light **vibrato**, with the library's own breath for air.
+- **Voice — real recorded singing** — actual sung vowels from the **VocalSet** corpus, sustained by a phase-coherent **splice sampler**: each note plays the nearest recorded pitch, detuned by at most about a semitone, so the formants stay put and the line is dead in tune. Every melodic syllable carries its real Occitan text: the sung vowel is the syllable's nucleus and the library's procedural **consonants** sound its onset and coda, while melismas stay legato on the one vowel.
+- **Voice — persistent singer** — each singer is a persistent library voice; only the pitch and vowel change from note to note, exactly as in real singing. Neighbouring pitches glide **legato** and held notes bloom with expressive **vibrato**, with the library's own breath for air.
 - **Drone** — a sustained open fifth (tonic + fifth), made **subtractively** (detuned saw oscillators through a gently resonant low-pass pad with a breathing cutoff), holds beneath the voice as a *vielle* or *citole* would drone beneath a sung *canso*.
 - **Ensemble** — the Solo / Duo / Ensemble control layers extra detuned, jittered singers over the lyric line, with a soft limiter and a warm **great-chamber convolution reverb** (~3.5 s tail with early reflections).
 
-The melody itself is generated as an arch-shaped **canso** phrase in the chosen mode: it lifts from the finalis to a high point, dwells at the apex, then descends by step to cadence home — breathing between phrases, with occasional dance-song (*dansa*) lilt.
+The melodies themselves are **real**, following the manuscript readings (after the Troubadour Melodies Database / van der Werf), and each piece keeps its historical form — frons + cauda, through-composed *oda continua*, the alba's *l'alba* refrain, or the estampida's paired puncta with *ouvert* and *clos* endings — re-tuning the vielle drone to its own final + fifth. The cansos flow in free declamatory rhythm; *Kalenda maya*, a dance song, is sung in a measured lilting triple metre.
 
 ## Where it sits — the lineage of early Western music
 
@@ -34,16 +36,16 @@ Plainsong ──► Organum ──► Ars Nova ──► (Renaissance polyphony)
    │  (a 2nd voice   (rhythmic
    │   is added)      sophistication)
    │
-   └── a parallel secular branch: Troubadour song ──► instrumental Estampie dances
+   └── a parallel secular branch: Troubadour song ──► instrumental estampie dances
 ```
 
-| App | Style | Synthesis technique |
+| App | Style | Voice |
 |---|---|---|
-| [Synth Gregorian](https://github.com/BrendanJamesLynskey/Synth_Gregorian) | Plainsong | Source–filter formant vocal synthesis |
-| [Synth Organum](https://github.com/BrendanJamesLynskey/Synth_Organum) | Notre-Dame polyphony | FOF vocal synthesis in Pythagorean just intonation |
-| [Synth Ars Nova](https://github.com/BrendanJamesLynskey/Synth_ArsNova) | 14th-c. isorhythm | Formant vocal synthesis + isorhythmic talea/color |
-| **Synth Troubadour** (this) | Secular monophony | FOF vocal synthesis (shared `vocal-voices.js` library, the sung melody) over a subtractive-synth vielle drone |
-| [Synth Estampie](https://github.com/BrendanJamesLynskey/Synth_Estampie) | Medieval dance | Physical modelling (instrumental dance) |
+| [Synth Gregorian](https://github.com/BrendanJamesLynskey/Synth_Gregorian) | Plainsong | Real sampled voices, straight-tone chant |
+| [Synth Organum](https://github.com/BrendanJamesLynskey/Synth_Organum) | Notre-Dame polyphony | Real sampled voices in Pythagorean just intonation |
+| **Synth Troubadour** (this) | Secular monophony | Real sampled voice (the sung melody) over a subtractive-synth vielle drone |
+
+The shared sampled voice at the heart of all three is explored in depth — alongside a century of pure-synthesis techniques — in [Vocal Synthesis](https://github.com/BrendanJamesLynskey/Vocal_Synthesis).
 
 ## Quick start
 
@@ -62,8 +64,8 @@ Open <http://localhost:8080> and press **Begin Song**. Any static file server wo
 | `index.html` | Landing page — detects device, links to desktop or mobile |
 | `desktop.html` | Desktop web app |
 | `style.css` | Courtly-themed styles (rose, wine-red, gold) |
-| `vocal-voices.js` | Shared library of interchangeable vocal-synthesis engines (FOF, formant, additive, vocal-tract) |
-| `troubadour-engine.js` | Song engine driving `vocal-voices.js` (sung melody) + subtractive vielle drone (Web Audio API) |
+| `vocal-voices.js` | Shared sampled-voice library — real VocalSet vowels, formant-preserving pitch-mapping, and procedural consonant articulation |
+| `troubadour-engine.js` | Song engine (five-piece repertoire) driving `vocal-voices.js` (sung melody) + subtractive vielle drone (Web Audio API) |
 | `app.js` | UI controller, stave visualizer, rose petals |
 | `troubadour_mobile.html` | Self-contained mobile version (single file) |
 
@@ -71,7 +73,7 @@ Open <http://localhost:8080> and press **Begin Song**. Any static file server wo
 
 | Control | Description |
 |---|---|
-| **Mode** | One of the 8 church tones (Dorian → Hypomixolydian) |
+| **Mode** | Chooses the **piece** — I *A chantar m'er*, II *Can vei la lauzeta*, III *Reis glorios*, IV *Kalenda maya*, V *Lanquan li jorn* (higher buttons wrap around); each melody carries its own historical mode and final |
 | **Voice** | Volume of the melody / lyric line |
 | **Drone** | Volume of the sustained open-fifth drone |
 | **Brightness** | Vocal brightness / vowel openness of the sung voice (and drone filter) — from dark and veiled to open and ringing |
