@@ -41,11 +41,11 @@ Plainsong ──► Organum ──► Ars Nova ──► (Renaissance polyphony)
 
 | App | Style | Voice |
 |---|---|---|
-| [Synth Gregorian](https://github.com/BrendanJamesLynskey/Synth_Gregorian) | Plainsong | Real sampled voices, straight-tone chant |
+| [Synth Gregorian](https://github.com/BrendanJamesLynskey/Synth_Gregorian) | Plainsong | Ethereal sine tones by default; optional real sampled voices, straight-tone chant |
 | [Synth Organum](https://github.com/BrendanJamesLynskey/Synth_Organum) | Notre-Dame polyphony | Real sampled voices in Pythagorean just intonation |
 | **Synth Troubadour** (this) | Secular monophony | Real sampled voice (the sung melody) over a subtractive-synth vielle drone |
 
-The shared sampled voice at the heart of all three is explored in depth — alongside a century of pure-synthesis techniques — in [Vocal Synthesis](https://github.com/BrendanJamesLynskey/Vocal_Synthesis).
+The shared sampled voice that sings this app, Organum and Gregorian's optional **Voices** timbre is explored in depth — alongside a century of pure-synthesis techniques — in [Vocal Synthesis](https://github.com/BrendanJamesLynskey/Vocal_Synthesis).
 
 ## Quick start
 
